@@ -7,12 +7,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Budżet Domowy</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{background:#0f172a;color:#f1f5f9;font-family:system-ui,sans-serif;min-height:100vh;overscroll-behavior:none}
-input,select,button{font-family:inherit;font-size:14px}
-button{cursor:pointer;border:none;background:none}
-select option{background:#1e293b;color:#f1f5f9}
+body{background:#0f172a;color:#f1f5f9;font-family:system-ui,sans-serif;min-height:100vh}
+button{cursor:pointer;border:none;background:none;font-family:inherit;font-size:14px}
+input,select{font-family:inherit;font-size:14px}
+select option{background:#1e293b}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
@@ -20,24 +24,22 @@ select option{background:#1e293b;color:#f1f5f9}
 .inp{width:100%;background:#334155;border:1px solid #475569;border-radius:10px;padding:10px 12px;color:#f1f5f9;outline:none}
 .inp:focus{border-color:#38bdf8}
 .card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:16px}
-.spin{display:inline-block;width:14px;height:14px;border:2px solid #ffffff44;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+.sp{display:inline-block;width:16px;height:16px;border:2px solid #ffffff33;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
+.hide{display:none!important}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px}
 </style>
 </head>
 <body>
-<div id="app"></div>
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { h, render } from "https://unpkg.com/preact@10.19.3/dist/preact.module.js";
-import { useState, useEffect, useRef } from "https://unpkg.com/preact@10.19.3/hooks/dist/hooks.module.js";
-import htm from "https://unpkg.com/htm@3.1.1/dist/htm.module.js";
-import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.esm.js";
-Chart.register(...registerables);
-const html = htm.bind(h);
+<div id="root" style="min-height:100vh;display:flex;align-items:center;justify-content:center">
+  <div style="text-align:center;color:#94a3b8">
+    <div style="width:32px;height:32px;border:3px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px"></div>
+    Ładowanie…
+  </div>
+</div>
 
-// ── Firebase ──────────────────────────────────────────────────────────────────
-const app = initializeApp({
+<script>
+// ── Firebase init ─────────────────────────────────────────────────────────────
+firebase.initializeApp({
   apiKey:"AIzaSyBKW8-Uc-NEuRBmuP4dsLT1PYaTA3JNXCk",
   authDomain:"budzet-domowy-fead9.firebaseapp.com",
   databaseURL:"https://budzet-domowy-fead9-default-rtdb.europe-west1.firebasedatabase.app",
@@ -46,16 +48,8 @@ const app = initializeApp({
   messagingSenderId:"108516278201",
   appId:"1:108516278201:web:9617eecd327ac584f20068"
 });
-const db  = getDatabase(app);
-const auth = getAuth(app);
-const fb = {
-  listen: (path,cb,err) => onValue(ref(db,path),s=>cb(s.val()),err),
-  set: (path,val) => set(ref(db,path),val),
-  del: (path) => remove(ref(db,path)),
-  signIn: (pw) => signInWithEmailAndPassword(auth,"budzet@domowy.pl",pw),
-  signOut: () => signOut(auth),
-  onAuth: (cb) => onAuthStateChanged(auth,cb),
-};
+const db   = firebase.database();
+const auth = firebase.auth();
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PERSONS = ["Osoba 1","Osoba 2","Wspólne"];
@@ -63,820 +57,702 @@ const CATS = ["🏠 Mieszkanie","🛒 Jedzenie","🚗 Transport","💡 Rachunki"
 const MONTHS = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
 const C = {inc:"#22c55e",exp:"#ef4444",p1:"#6366f1",p2:"#f59e0b",sh:"#8b5cf6",bg:"#0f172a",card:"#1e293b",bdr:"#334155",txt:"#f1f5f9",mut:"#94a3b8",acc:"#38bdf8"};
 const CC = ["#6366f1","#f59e0b","#ef4444","#22c55e","#8b5cf6","#ec4899","#14b8a6","#f97316","#06b6d4","#84cc16","#a78bfa","#94a3b8","#f43f5e","#0ea5e9","#64748b"];
+const fmt = n => new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN"}).format(n||0);
+const el = id => document.getElementById(id);
 const now = new Date();
-const DEF = ()=>({type:"expense",amount:"",category:CATS[1],person:PERSONS[0],description:"",day:now.getDate(),month:now.getMonth(),year:now.getFullYear()});
-const fmt = n=>new Intl.NumberFormat("pl-PL",{style:"currency",currency:"PLN"}).format(n||0);
-const s = (...x)=>Object.assign({},...x);
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function useFB(path, def=[]) {
-  const [val,setVal] = useState(def);
-  useEffect(()=>{
-    if(!path) return;
-    return fb.listen(path, v=> setVal(v ? (Array.isArray(def) ? Object.values(v) : v) : def));
-  },[path]);
-  return val;
+// ── State ─────────────────────────────────────────────────────────────────────
+let STATE = {
+  view:"dashboard", fM:now.getMonth(), fY:now.getFullYear(),
+  txs:[], reps:[], excl:[], recurring:[], names:["Osoba 1","Osoba 2"],
+  editId:null, recEditId:null, repAmt:"", repFrom:"Osoba 1",
+  syncStatus:"connecting", form:defForm(), recForm:defRecForm(),
+  pieChart:null, barChart:null
+};
+
+function defForm(){ return {type:"expense",amount:"",category:CATS[1],person:PERSONS[0],description:"",day:now.getDate(),month:now.getMonth(),year:now.getFullYear(),excludeFromSettlement:false}; }
+function defRecForm(){ return {name:"",amount:"",category:CATS[4],person:PERSONS[2],day:1}; }
+
+// ── Firebase helpers ──────────────────────────────────────────────────────────
+function fbSet(path,val){ setState({syncStatus:"syncing"}); return db.ref(path).set(val).then(()=>setState({syncStatus:"connected"})).catch(()=>setState({syncStatus:"offline"})); }
+function fbDel(path){ setState({syncStatus:"syncing"}); return db.ref(path).remove().then(()=>setState({syncStatus:"connected"})).catch(()=>setState({syncStatus:"offline"})); }
+
+// ── Render engine ─────────────────────────────────────────────────────────────
+function setState(patch){ Object.assign(STATE,patch); render(); }
+
+function render(){
+  const s = STATE;
+  const root = el("root");
+
+  // ── Login ──────────────────────────────────────────────────────────────────
+  if(!s.authed){
+    root.innerHTML = `
+    <div class="fa" style="width:100%;max-width:340px;padding:24px">
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="font-size:52px">💰</div>
+        <div style="font-size:22px;font-weight:800;color:${C.acc};margin-top:8px">Budżet Domowy</div>
+        <div style="font-size:13px;color:${C.mut};margin-top:4px">Zaloguj się aby uzyskać dostęp</div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:5px">Hasło</label>
+          <input class="inp" type="password" id="loginPw" placeholder="Wpisz hasło…" autocomplete="current-password"/>
+        </div>
+        <div id="loginErr" class="hide" style="padding:9px 12px;border-radius:10px;background:#2d1515;color:#fca5a5;font-size:12px"></div>
+        <button id="loginBtn" onclick="doLogin()" style="padding:12px;border-radius:10px;font-weight:700;background:${C.acc};color:#0f172a;font-size:14px;width:100%">
+          🔓 Zaloguj się
+        </button>
+      </div>
+    </div>`;
+    el("loginPw").onkeydown = e => { if(e.key==="Enter") doLogin(); };
+    setTimeout(()=>el("loginPw")?.focus(),100);
+    return;
+  }
+
+  const filtered = s.txs.filter(t=>t.month===s.fM&&t.year===s.fY);
+  const settle = calcSettlement(filtered);
+  const cd = catData(filtered);
+  const tot = totals(filtered);
+
+  // adjusted balance
+  const monthRepsAll = s.reps.filter(r=>r.month===s.fM&&r.year===s.fY);
+  const repaidAll = settle ? monthRepsAll.filter(r=>r.from===settle.debtorP).reduce((a,r)=>a+r.amount,0) : 0;
+  const adjBal = (tot.inc - tot.exp) + repaidAll;
+
+  const syncCol = {connected:C.inc,syncing:"#f59e0b",offline:C.exp,connecting:C.mut}[s.syncStatus]||C.mut;
+  const syncLbl = {connected:"Zsynchronizowano",syncing:"Synchronizacja…",offline:"Offline",connecting:"Łączenie…"}[s.syncStatus]||"";
+  const pColors = [C.p1,C.p2,C.sh];
+  const navItems = [["dashboard","📊","Przegląd"],["transactions","📋","Transakcje"],["stats","📈","Wykresy"],["add","➕","Dodaj"],["recurring","🔄","Cykliczne"],["settings","⚙️","Ustawienia"]];
+
+  root.innerHTML = `
+  <div style="background:${C.bg};min-height:100vh;padding-bottom:24px">
+
+    <!-- Header -->
+    <div style="background:${C.card};border-bottom:1px solid ${C.bdr};padding:11px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10">
+      <div>
+        <div style="font-weight:800;font-size:16px;color:${C.acc}">💰 Budżet Domowy</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:${syncCol};margin-top:2px">
+          <span style="width:6px;height:6px;border-radius:50%;background:${syncCol};display:inline-block;${s.syncStatus==='syncing'?'animation:pulse 1.2s infinite':''}"></span>
+          ${syncLbl}
+        </div>
+      </div>
+      <div id="headerRight">${renderHeaderRight()}</div>
+    </div>
+
+    <!-- Month nav -->
+    <div style="background:${C.card};border-bottom:1px solid ${C.bdr};padding:8px 16px;display:flex;align-items:center">
+      <button onclick="prevMonth()" style="color:${C.mut};font-size:22px;padding:0 8px">‹</button>
+      <span style="flex:1;text-align:center;font-weight:700;font-size:14px">${MONTHS[s.fM]} ${s.fY}</span>
+      <button onclick="nextMonth()" style="color:${C.mut};font-size:22px;padding:0 8px">›</button>
+    </div>
+
+    <!-- Nav tabs -->
+    <div style="display:flex;border-bottom:1px solid ${C.bdr};background:${C.card}">
+      ${navItems.map(([v,ico,lbl])=>`
+        <button onclick="navTo('${v}')" style="flex:1;padding:8px 0 6px;font-size:11px;font-weight:600;
+          color:${s.view===v?C.acc:C.mut};border-bottom:2px solid ${s.view===v?C.acc:'transparent'};background:transparent">
+          <div style="font-size:17px">${ico}</div><div>${lbl}</div>
+        </button>`).join("")}
+    </div>
+
+    <div style="padding:14px;max-width:520px;margin:0 auto" class="fa">
+      ${renderView(filtered, settle, cd, tot, adjBal)}
+    </div>
+  </div>`;
+
+  // Render charts after DOM update
+  if(s.view==="stats") setTimeout(()=>renderCharts(cd), 50);
 }
 
+function renderHeaderRight(){
+  const s = STATE;
+  if(s.editNames) return `
+    <div style="display:flex;gap:6px;align-items:center">
+      <input class="inp" id="n0" value="${s.names[0]}" style="width:74px;font-size:12px;padding:6px 8px"/>
+      <input class="inp" id="n1" value="${s.names[1]}" style="width:74px;font-size:12px;padding:6px 8px"/>
+      <button onclick="saveNames()" style="background:${C.acc};color:#0f172a;border-radius:6px;padding:6px 10px;font-weight:700;font-size:12px">✓</button>
+      <button onclick="setState({editNames:false})" style="background:#334155;color:${C.mut};border-radius:6px;padding:6px 8px">✕</button>
+    </div>`;
+  return `<div style="display:flex;gap:10px;align-items:center">
+    <button onclick="setState({editNames:true,tmpNames:[...STATE.names]})" style="color:${C.mut};font-size:12px">✏️ Imiona</button>
+    <button onclick="auth.signOut()" style="color:#ef444488;font-size:13px" title="Wyloguj">🔒</button>
+  </div>`;
+}
+
+function renderView(filtered, settle, cd, tot, adjBal){
+  const s = STATE;
+  switch(s.view){
+    case "dashboard": return renderDashboard(filtered, settle, cd, tot, adjBal);
+    case "transactions": return renderTransactions(filtered);
+    case "stats": return renderStats(cd);
+    case "add": return renderAdd();
+    case "recurring": return renderRecurring();
+    case "settings": return renderSettings();
+    default: return "";
+  }
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+function renderDashboard(filtered, settle, cd, tot, adjBal){
+  const s = STATE;
+  const monthRepsAll = s.reps.filter(r=>r.month===s.fM&&r.year===s.fY);
+  const p1rep = monthRepsAll.filter(r=>r.from===PERSONS[0]).reduce((a,r)=>a+r.amount,0);
+  const p2rep = monthRepsAll.filter(r=>r.from===PERSONS[1]).reduce((a,r)=>a+r.amount,0);
+
+  const summaryCards = [["↑ Przychody",tot.inc,C.inc],["↓ Wydatki",tot.exp,C.exp],["= Bilans",adjBal,adjBal>=0?C.inc:C.exp]]
+    .map(([l,v,col])=>`<div class="card" style="padding:12px"><div style="font-size:10px;color:${C.mut};margin-bottom:4px">${l}</div><div style="font-weight:700;font-size:13px;color:${col}">${fmt(v)}</div></div>`).join("");
+
+  const personRows = [0,1,2].map(i=>{
+    const col = [C.p1,C.p2,C.sh][i];
+    const label = i<2 ? s.names[i] : "Wspólne";
+    const pt = totals(filtered.filter(t=>t.person===PERSONS[i]));
+    const repPaid = i===0?p1rep:i===1?p2rep:0;
+    const repRcv  = i===0?p2rep:i===1?p1rep:0;
+    const adjExp  = pt.exp + repPaid - repRcv;
+    const repNote = (repPaid>0||repRcv>0)&&i<2 ? `<span style="font-size:10px;color:${C.mut};font-style:italic">(${repPaid>0?"+":""}${fmt(repPaid-repRcv)} spłata)</span>` : "";
+    return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${i<2?10:0}px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${col}"></div>
+        <span style="font-size:14px">${label}</span>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:${C.inc}">+${fmt(pt.inc)}</div>
+        <div style="font-size:11px;color:${C.exp};display:flex;align-items:center;gap:4px;justify-content:flex-end">-${fmt(adjExp)} ${repNote}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const topCats = cd.slice(0,5).map((c,i)=>`
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+        <span>${c.name}</span><b style="color:${C.exp}">${fmt(c.v)}</b>
+      </div>
+      <div style="height:5px;border-radius:4px;background:#334155">
+        <div style="height:5px;border-radius:4px;background:${CC[i]};width:${(c.v/cd[0].v)*100}%;transition:width .4s"></div>
+      </div>
+    </div>`).join("");
+
+  return `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">${summaryCards}</div>
+      <div class="card"><div style="font-weight:600;font-size:13px;color:${C.mut};margin-bottom:12px">Podział per osoba</div>${personRows}</div>
+      ${settle ? renderSettle(settle) : ""}
+      ${cd.length>0?`<div class="card"><div style="font-weight:600;font-size:13px;color:${C.mut};margin-bottom:12px">Top kategorie wydatków</div>${topCats}</div>`:""}
+    </div>`;
+}
+
+function renderSettle(st){
+  const s = STATE;
+  const bars = [{name:s.names[0],own:st.p1o,paid:st.p1paid,col:C.p1},{name:s.names[1],own:st.p2o,paid:st.p2paid,col:C.p2}].map(p=>`
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px">
+        <div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;border-radius:50%;background:${p.col}"></div><b>${p.name}</b></div>
+        <span style="color:${C.mut}">własne: <span style="color:${C.exp}">${fmt(p.own)}</span> · łącznie: <b style="color:${C.txt}">${fmt(p.paid)}</b></span>
+      </div>
+      <div style="height:6px;border-radius:4px;background:#334155">
+        <div style="height:6px;border-radius:4px;background:${p.col};width:${(p.paid/st.maxPaid)*100}%"></div>
+      </div>
+    </div>`).join("");
+
+  const sharedNote = st.sh>0 ? `<div style="font-size:11px;color:${C.mut};margin-bottom:10px;padding:6px 10px;background:#334155;border-radius:8px">Wydatki wspólne ${fmt(st.sh)} podzielone po ${fmt(st.sh/2)} na osobę</div>` : "";
+
+  let verdict = "";
+  if(st.raw>0.01){
+    const repLines = st.repaid>0 ? `
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:${C.mut};padding:4px 0;border-top:1px solid ${C.bdr};margin-bottom:4px">
+        <span>Pierwotny dług:</span><span style="text-decoration:line-through">${fmt(st.raw)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:${C.inc};margin-bottom:6px">
+        <span>Spłacono:</span><span>- ${fmt(st.repaid)}</span>
+      </div>` : "";
+    verdict = `<div style="padding:12px 14px;border-radius:12px;background:linear-gradient(135deg,#1e3a5f,#1e293b);border:1px solid ${C.acc}44;margin-bottom:12px">
+      <div style="font-size:11px;color:${C.mut};text-align:center;margin-bottom:4px">Do wyrównania</div>
+      <div style="font-size:15px;font-weight:700;color:${C.acc};text-align:center;margin-bottom:4px">${st.debtor} → ${st.creditor}</div>
+      ${repLines}
+      <div style="font-size:${st.after<0.01?18:24}px;font-weight:800;color:${st.after<0.01?C.inc:'#fff'};text-align:center">${st.after<0.01?"✅ Dług spłacony!":fmt(st.after)}</div>
+    </div>`;
+  } else {
+    verdict = `<div style="padding:10px;border-radius:12px;background:#14532d33;border:1px solid #22c55e44;text-align:center;font-size:13px;font-weight:600;color:${C.inc};margin-bottom:12px">✅ Wydatki są równo podzielone</div>`;
+  }
+
+  const repForm = st.raw>0.01&&st.after>0.01 ? `
+    <div style="border-top:1px solid ${C.bdr};padding-top:12px">
+      <div style="font-size:12px;font-weight:600;color:${C.mut};margin-bottom:8px">💸 Zarejestruj spłatę</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        ${[0,1].map(i=>`<button onclick="setState({repFrom:PERSONS[${i}]})" style="flex:1;padding:7px;border-radius:8px;font-size:11px;font-weight:700;border:2px solid ${[C.p1,C.p2][i]};background:${STATE.repFrom===PERSONS[i]?[C.p1,C.p2][i]:'transparent'};color:${STATE.repFrom===PERSONS[i]?'#fff':[C.p1,C.p2][i]}">${s.names[i]} płaci</button>`).join("")}
+      </div>
+      <div style="display:flex;gap:8px">
+        <input class="inp" type="number" min="0" step="0.01" placeholder="Kwota PLN" id="repAmtInp" value="${STATE.repAmt}" oninput="STATE.repAmt=this.value" style="flex:1"/>
+        <button onclick="addRepayment()" style="padding:10px 14px;border-radius:10px;font-weight:700;background:${C.inc};color:#fff;font-size:13px;white-space:nowrap">✓ Dodaj</button>
+      </div>
+    </div>` : "";
+
+  const repHistory = st.monthReps.length>0 ? `
+    <div style="border-top:1px solid ${C.bdr};padding-top:12px;margin-top:12px">
+      <div style="font-size:12px;font-weight:600;color:${C.mut};margin-bottom:8px">Historia spłat</div>
+      ${st.monthReps.sort((a,b)=>b.id-a.id).map(r=>{
+        const fi=PERSONS.indexOf(r.from); const fn=fi>=0?s.names[fi]:r.from; const tn=s.names[fi===0?1:0];
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:8px;background:${C.bg};margin-bottom:6px">
+          <div style="font-size:12px"><b style="color:${C.inc}">${fn}</b><span style="color:${C.mut}"> → </span><b>${tn}</b><span style="font-size:10px;color:${C.mut};margin-left:6px">${r.date}</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><b style="color:${C.inc}">${fmt(r.amount)}</b><button onclick="fbDel('repayments/${r.id}')" style="color:${C.mut};font-size:13px">🗑️</button></div>
+        </div>`;
+      }).join("")}
+    </div>` : "";
+
+  return `<div class="card">
+    <div style="font-weight:700;font-size:13px;margin-bottom:12px">⚖️ Rozliczenie wydatków</div>
+    ${bars}${sharedNote}${verdict}${repForm}${repHistory}
+  </div>`;
+}
+
+// ── Transactions ──────────────────────────────────────────────────────────────
+function renderTransactions(filtered){
+  const s = STATE;
+  if(!filtered.length) return `<div style="text-align:center;padding:60px 0;color:${C.mut}"><div style="font-size:44px;margin-bottom:8px">📂</div><div style="margin-bottom:8px">Brak transakcji</div><button onclick="navTo('add')" style="color:${C.acc};font-size:13px;text-decoration:underline">Dodaj pierwszą</button></div>`;
+  return `<div style="display:flex;flex-direction:column;gap:10px">
+    ${[...filtered].sort((a,b)=>(b.day||1)-(a.day||1)||b.id-a.id).map(tx=>{
+      const pi=PERSONS.indexOf(tx.person); const pc=[C.p1,C.p2,C.sh][pi]||C.mut; const pn=pi<2?s.names[pi]:"Wspólne";
+      const exCl = tx.excludeFromSettlement;
+      return `<div class="card" style="padding:12px;border-color:${exCl?'#8b5cf644':C.bdr}">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:24px">${tx.category.split(" ")[0]}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tx.description||tx.category.split(" ").slice(1).join(" ")}</div>
+            <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center">
+              ${tx.day?`<span class="tag" style="color:${C.acc};background:${C.acc}22">${tx.day} ${MONTHS[tx.month]?.slice(0,3)}</span>`:""}
+              <span class="tag" style="color:${pc};background:${pc}22">${pn}</span>
+              ${exCl?`<span class="tag" style="color:#8b5cf6;background:#8b5cf622">poza rozliczeniem</span>`:""}
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-weight:700;font-size:13px;color:${tx.type==="income"?C.inc:C.exp}">${tx.type==="income"?"+":"-"}${fmt(tx.amount)}</div>
+            <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">
+              <button onclick="startEdit(${tx.id})" style="font-size:15px;opacity:.6">✏️</button>
+              <button onclick="fbDel('transactions/${tx.id}')" style="font-size:15px;opacity:.6">🗑️</button>
+            </div>
+          </div>
+        </div>
+        ${tx.type==="expense"?`<button onclick="toggleExclude(${tx.id})"
+          style="margin-top:10px;width:100%;padding:6px;border-radius:8px;font-size:11px;font-weight:600;
+            border:1px solid ${exCl?'#8b5cf688':C.bdr};background:${exCl?'#8b5cf611':'transparent'};color:${exCl?'#8b5cf6':C.mut}">
+          ${exCl?"✅ Poza rozliczeniem — kliknij aby włączyć":"⚖️ Wyklucz z rozliczenia między osobami"}
+        </button>`:""}
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function renderStats(cd){
+  return `<div style="display:flex;flex-direction:column;gap:12px">
+    ${cd.length>0?`<div class="card">
+      <div style="font-weight:600;font-size:13px;color:${C.mut};margin-bottom:12px">Wydatki wg kategorii</div>
+      <canvas id="pieChart" style="max-height:200px"></canvas>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:12px">
+        ${cd.map((c,i)=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px">
+          <div style="width:8px;height:8px;border-radius:2px;background:${CC[i%15]};flex-shrink:0"></div>
+          <span style="color:${C.mut};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.name.split(" ").slice(1).join(" ")}</span>
+          <b style="margin-left:auto;flex-shrink:0">${fmt(c.v)}</b>
+        </div>`).join("")}
+      </div>
+    </div>`:""}
+    <div class="card">
+      <div style="font-weight:600;font-size:13px;color:${C.mut};margin-bottom:12px">Ostatnie 6 miesięcy</div>
+      <canvas id="barChart" style="max-height:220px"></canvas>
+    </div>
+  </div>`;
+}
+
+function renderCharts(cd){
+  const s = STATE;
+  if(s.pieChart){s.pieChart.destroy();s.pieChart=null;}
+  if(s.barChart){s.barChart.destroy();s.barChart=null;}
+
+  const pieEl = el("pieChart");
+  if(pieEl && cd.length>0){
+    s.pieChart = new Chart(pieEl,{type:"doughnut",data:{labels:cd.map(d=>d.name.split(" ").slice(1).join(" ")),datasets:[{data:cd.map(d=>d.v),backgroundColor:CC,borderWidth:2,borderColor:"#1e293b"}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>" "+fmt(c.raw)}}}}});
+  }
+  const barEl = el("barChart");
+  if(barEl){
+    const m6 = Array.from({length:6},(_,i)=>{
+      const d=new Date(s.fY,s.fM-i,1);
+      const arr=s.txs.filter(t=>t.month===d.getMonth()&&t.year===d.getFullYear());
+      const t=totals(arr);
+      return {name:MONTHS[d.getMonth()].slice(0,3),inc:t.inc,exp:t.exp};
+    }).reverse();
+    s.barChart = new Chart(barEl,{type:"bar",data:{labels:m6.map(d=>d.name),datasets:[{label:"Przychody",data:m6.map(d=>d.inc),backgroundColor:"#22c55e",borderRadius:5},{label:"Wydatki",data:m6.map(d=>d.exp),backgroundColor:"#ef4444",borderRadius:5}]},options:{responsive:true,plugins:{legend:{labels:{color:"#94a3b8",font:{size:11}}},tooltip:{callbacks:{label:c=>" "+fmt(c.raw)}}},scales:{x:{ticks:{color:"#94a3b8",font:{size:11}},grid:{color:"#334155"}},y:{ticks:{color:"#94a3b8",font:{size:11},callback:v=>fmt(v)},grid:{color:"#334155"}}}}});
+  }
+}
+
+// ── Add/Edit ──────────────────────────────────────────────────────────────────
+function renderAdd(){
+  const s = STATE; const f = s.form;
+  const flash = s.scanFlash;
+  return `<div style="display:flex;flex-direction:column;gap:12px">
+    ${!s.editId?`<button onclick="openScanner()" style="width:100%;padding:14px;border-radius:12px;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px;
+      border:2px solid ${flash?'#22c55e':C.acc};background:${flash?'#22c55e22':'transparent'};color:${flash?'#22c55e':C.acc}">
+      <span style="font-size:22px">🧾</span>${flash?"✅ Dane odczytane!":"Skanuj paragon"}
+    </button>`:""}
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <b style="font-size:15px">${s.editId?"Edytuj transakcję":"Lub wpisz ręcznie"}</b>
+      <div style="display:flex;border-radius:10px;overflow:hidden;border:1px solid ${C.bdr}">
+        ${[["expense","💸 Wydatek"],["income","💵 Przychód"]].map(([v,l])=>`<button onclick="setForm('type','${v}')" style="flex:1;padding:10px;font-weight:700;font-size:14px;background:${f.type===v?(v==="income"?C.inc:C.exp):"transparent"};color:${f.type===v?"#fff":C.mut}">${l}</button>`).join("")}
+      </div>
+      <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Kwota (PLN)</label>
+        <input class="inp" type="number" min="0" step="0.01" placeholder="0,00" value="${f.amount}" oninput="setForm('amount',this.value)" id="amtInp"/></div>
+      <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:6px">Kto?</label>
+        <div style="display:flex;gap:8px">
+          ${PERSONS.map((p,i)=>{const col=[C.p1,C.p2,C.sh][i];const lbl=i<2?s.names[i]:"Wspólne";
+            return `<button onclick="setForm('person','${p}')" style="flex:1;padding:9px 4px;border-radius:10px;font-size:12px;font-weight:700;border:2px solid ${col};background:${f.person===p?col:"transparent"};color:${f.person===p?"#fff":col}">${lbl}</button>`;}).join("")}
+        </div></div>
+      <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Kategoria</label>
+        <select class="inp" onchange="setForm('category',this.value)">${CATS.map(c=>`<option value="${c}" ${f.category===c?"selected":""}>${c}</option>`).join("")}</select></div>
+      <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Opis (opcjonalnie)</label>
+        <input class="inp" type="text" placeholder="np. Biedronka, prąd…" value="${f.description||""}" oninput="setForm('description',this.value)"/></div>
+      <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:8px">
+        <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Dzień</label>
+          <input class="inp" type="number" min="1" max="31" value="${f.day||""}" oninput="setForm('day',+this.value||1)"/></div>
+        <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Miesiąc</label>
+          <select class="inp" onchange="setForm('month',+this.value)">${MONTHS.map((m,i)=>`<option value="${i}" ${f.month===i?"selected":""}>${m}</option>`).join("")}</select></div>
+        <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Rok</label>
+          <select class="inp" onchange="setForm('year',+this.value)">${[2024,2025,2026,2027].map(y=>`<option value="${y}" ${f.year===y?"selected":""}>${y}</option>`).join("")}</select></div>
+      </div>
+      ${f.type==="expense"?`<button onclick="toggleFormExclude()" style="width:100%;padding:7px;border-radius:8px;font-size:11px;font-weight:600;border:1px solid ${f.excludeFromSettlement?'#8b5cf688':C.bdr};background:${f.excludeFromSettlement?'#8b5cf611':'transparent'};color:${f.excludeFromSettlement?'#8b5cf6':C.mut}">
+        ${f.excludeFromSettlement?"✅ Poza rozliczeniem — kliknij aby włączyć":"⚖️ Wyklucz z rozliczenia między osobami"}
+      </button>`:""}
+      <div style="display:flex;gap:10px">
+        <button onclick="addOrUpdate()" style="flex:1;padding:12px;border-radius:10px;font-weight:700;background:${C.acc};color:#0f172a;font-size:14px">${s.editId?"💾 Zapisz zmiany":"✅ Dodaj transakcję"}</button>
+        ${s.editId?`<button onclick="setState({editId:null,form:defForm()})" style="padding:12px 16px;border-radius:10px;border:1px solid ${C.bdr};color:${C.mut};font-weight:600">Anuluj</button>`:""}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Recurring ─────────────────────────────────────────────────────────────────
+function renderRecurring(){
+  const s = STATE; const f = s.recForm;
+  const activeRec = s.recurring.filter(r=>r.active);
+  const totalMo = activeRec.reduce((a,r)=>a+ +r.amount,0);
+
+  return `<div style="display:flex;flex-direction:column;gap:12px">
+    ${activeRec.length>0?`<div class="card" style="background:linear-gradient(135deg,#1e293b,#0f2133);border:1px solid ${C.acc}33">
+      <div style="font-size:12px;color:${C.mut};margin-bottom:4px">Łączny koszt miesięczny</div>
+      <div style="font-size:26px;font-weight:800;color:${C.acc}">${fmt(totalMo)}</div>
+      <div style="font-size:11px;color:${C.mut};margin-top:2px">${activeRec.length} aktywnych subskrypcji</div>
+    </div>`:""}
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <b style="font-size:14px">${s.recEditId?"✏️ Edytuj subskrypcję":"➕ Dodaj subskrypcję"}</b>
+      <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Nazwa</label>
+        <input class="inp" type="text" placeholder="np. Netflix, Spotify…" value="${f.name||""}" oninput="setRecForm('name',this.value)"/></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Kwota (PLN)</label>
+          <input class="inp" type="number" min="0" step="0.01" placeholder="0,00" value="${f.amount||""}" oninput="setRecForm('amount',this.value)"/></div>
+        <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Dzień miesiąca</label>
+          <input class="inp" type="number" min="1" max="28" value="${f.day||1}" oninput="setRecForm('day',+this.value||1)"/></div>
+      </div>
+      <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Kategoria</label>
+        <select class="inp" onchange="setRecForm('category',this.value)">${CATS.map(c=>`<option value="${c}" ${f.category===c?"selected":""}>${c}</option>`).join("")}</select></div>
+      <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:6px">Kto płaci?</label>
+        <div style="display:flex;gap:8px">
+          ${PERSONS.map((p,i)=>{const col=[C.p1,C.p2,C.sh][i];const lbl=i<2?s.names[i]:"Wspólne";
+            return `<button onclick="setRecForm('person','${p}')" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:700;border:2px solid ${col};background:${f.person===p?col:"transparent"};color:${f.person===p?"#fff":col}">${lbl}</button>`;}).join("")}
+        </div></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="saveRecurring()" style="flex:1;padding:11px;border-radius:10px;font-weight:700;background:${C.acc};color:#0f172a;font-size:14px">${s.recEditId?"💾 Zapisz":"✅ Dodaj"}</button>
+        ${s.recEditId?`<button onclick="setState({recEditId:null,recForm:defRecForm()})" style="padding:11px 14px;border-radius:10px;border:1px solid ${C.bdr};color:${C.mut};font-weight:600">Anuluj</button>`:""}
+      </div>
+    </div>
+    ${s.recurring.length===0?`<div style="text-align:center;padding:40px 0;color:${C.mut}"><div style="font-size:40px;margin-bottom:8px">🔄</div><div>Brak subskrypcji</div></div>`:""}
+    ${[...s.recurring].sort((a,b)=>(+b.active)-(+a.active)||a.name.localeCompare(b.name)).map(r=>{
+      const pi=PERSONS.indexOf(r.person); const pc=[C.p1,C.p2,C.sh][pi]||C.mut; const pn=pi<2?s.names[pi]:"Wspólne";
+      return `<div class="card" style="opacity:${r.active?1:.5}">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:24px">${r.category.split(" ")[0]}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px">
+              ${r.name}${!r.active?`<span style="font-size:10px;color:${C.mut};padding:1px 6px;border:1px solid ${C.bdr};border-radius:4px">nieaktywna</span>`:""}
+            </div>
+            <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center">
+              <span class="tag" style="color:${pc};background:${pc}22">${pn}</span>
+              <span style="font-size:11px;color:${C.mut}">${r.day}. każdego miesiąca</span>
+              ${r.excludeFromSettlement?`<span class="tag" style="color:#8b5cf6;background:#8b5cf622">poza rozliczeniem</span>`:""}
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0"><div style="font-weight:800;font-size:15px;color:${C.exp}">-${fmt(r.amount)}</div><div style="font-size:10px;color:${C.mut}">/ miesiąc</div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid ${C.bdr}">
+          <button onclick="toggleRecurring('${r.id}')" style="flex:1;padding:7px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid ${r.active?C.exp:C.inc};color:${r.active?C.exp:C.inc};background:transparent">${r.active?"⏸ Dezaktywuj":"▶ Aktywuj"}</button>
+          <button onclick="toggleRecExclude('${r.id}')" style="flex:1;padding:7px;border-radius:8px;font-size:11px;font-weight:600;border:1px solid ${r.excludeFromSettlement?'#8b5cf688':C.bdr};color:${r.excludeFromSettlement?'#8b5cf6':C.mut};background:${r.excludeFromSettlement?'#8b5cf611':'transparent'}">${r.excludeFromSettlement?"✅ Poza rozl.":"⚖️ Wyklucz"}</button>
+          <button onclick="editRecurring('${r.id}')" style="padding:7px 10px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid ${C.bdr};color:${C.mut};background:transparent">✏️</button>
+          <button onclick="deleteRecurring('${r.id}')" style="padding:7px 10px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid #ef444444;color:${C.exp};background:transparent">🗑️</button>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+function renderSettings(){
+  const s = STATE;
+  return `<div style="display:flex;flex-direction:column;gap:12px">
+    <div class="card">
+      <div style="font-weight:700;font-size:15px;margin-bottom:4px">⚙️ Ustawienia rozliczenia</div>
+      <div style="font-size:12px;color:${C.mut};margin-bottom:16px">Zaznaczone kategorie <b style="color:${C.txt}">nie będą wliczane</b> do wspólnego rozliczenia.</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${CATS.map(cat=>{
+          const ex = Array.isArray(s.excl)&&s.excl.includes(cat);
+          return `<button onclick="toggleExclCat('${cat.replace(/'/g,"\\'")}','${ex}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:12px;border:1px solid ${ex?'#ef444466':C.bdr};background:${ex?'#2d151522':C.bg};width:100%">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:20px">${cat.split(" ")[0]}</span>
+              <span style="font-size:14px;font-weight:600;color:${ex?C.mut:C.txt}">${cat.split(" ").slice(1).join(" ")}</span>
+            </div>
+            <div style="width:22px;height:22px;border-radius:6px;border:2px solid ${ex?C.exp:C.bdr};background:${ex?C.exp:'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              ${ex?`<span style="color:#fff;font-size:13px;font-weight:700">✕</span>`:""}
+            </div>
+          </button>`;
+        }).join("")}
+      </div>
+      ${Array.isArray(s.excl)&&s.excl.length>0?`<div style="margin-top:14px;padding:10px 12px;border-radius:10px;background:#2d1515;border:1px solid #ef444433;font-size:12px;color:#fca5a5">Wykluczone: ${s.excl.map(c=>c.split(" ")[0]).join(" ")} (${s.excl.length})</div>`:""}
+    </div>
+  </div>`;
+}
+
+// ── Calculations ──────────────────────────────────────────────────────────────
 function totals(arr){
   return {
-    inc: arr.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0),
-    exp: arr.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0),
+    inc: arr.filter(t=>t.type==="income").reduce((a,t)=>a+t.amount,0),
+    exp: arr.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0)
   };
 }
 
-// ── Charts ────────────────────────────────────────────────────────────────────
-function PieChart({data}){
-  const canv=useRef(); const ch=useRef();
-  useEffect(()=>{
-    if(!canv.current||!data.length) return;
-    if(ch.current) ch.current.destroy();
-    ch.current=new Chart(canv.current,{
-      type:"doughnut",
-      data:{labels:data.map(d=>d.name.split(" ").slice(1).join(" ")),datasets:[{data:data.map(d=>d.v),backgroundColor:CC,borderWidth:2,borderColor:"#1e293b"}]},
-      options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>" "+fmt(c.raw)}}}}
-    });
-    return()=>{if(ch.current)ch.current.destroy();};
-  },[data]);
-  if(!data.length) return null;
-  return html`<canvas ref=${canv} style="max-height:200px"/>`;
+function catData(filtered){
+  const m={};
+  filtered.filter(t=>t.type==="expense").forEach(t=>{m[t.category]=(m[t.category]||0)+t.amount;});
+  return Object.entries(m).map(([name,v])=>({name,v})).sort((a,b)=>b.v-a.v);
 }
 
-function BarChart({data}){
-  const canv=useRef(); const ch=useRef();
-  useEffect(()=>{
-    if(!canv.current) return;
-    if(ch.current) ch.current.destroy();
-    ch.current=new Chart(canv.current,{
-      type:"bar",
-      data:{labels:data.map(d=>d.name),datasets:[
-        {label:"Przychody",data:data.map(d=>d.inc),backgroundColor:"#22c55e",borderRadius:5},
-        {label:"Wydatki",data:data.map(d=>d.exp),backgroundColor:"#ef4444",borderRadius:5}
-      ]},
-      options:{responsive:true,
-        plugins:{legend:{labels:{color:"#94a3b8",font:{size:11}}},tooltip:{callbacks:{label:c=>" "+fmt(c.raw)}}},
-        scales:{x:{ticks:{color:"#94a3b8",font:{size:11}},grid:{color:"#334155"}},
-                y:{ticks:{color:"#94a3b8",font:{size:11},callback:v=>fmt(v)},grid:{color:"#334155"}}}}
-    });
-    return()=>{if(ch.current)ch.current.destroy();};
-  },[data]);
-  return html`<canvas ref=${canv} style="max-height:220px"/>`;
+function calcSettlement(filtered){
+  const s = STATE;
+  const inScope = t => !t.excludeFromSettlement && (Array.isArray(s.excl)?!s.excl.includes(t.category):true);
+  const p1o=filtered.filter(t=>t.type==="expense"&&t.person===PERSONS[0]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
+  const p2o=filtered.filter(t=>t.type==="expense"&&t.person===PERSONS[1]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
+  const sh =filtered.filter(t=>t.type==="expense"&&t.person==="Wspólne"&&inScope(t)).reduce((a,t)=>a+t.amount,0);
+  const total=p1o+p2o+sh; if(!total) return null;
+  const fair=total/2; const p1paid=p1o+sh/2; const p2paid=p2o+sh/2; const p1bal=p1paid-fair;
+  const debtor=p1bal<0?s.names[0]:s.names[1]; const debtorP=p1bal<0?PERSONS[0]:PERSONS[1]; const creditor=p1bal<0?s.names[1]:s.names[0];
+  const raw=Math.abs(p1bal);
+  const monthReps=s.reps.filter(r=>r.month===s.fM&&r.year===s.fY);
+  const repaid=monthReps.filter(r=>r.from===debtorP).reduce((a,r)=>a+r.amount,0);
+  const after=Math.max(0,raw-repaid);
+  return {p1o,p2o,sh,total,p1paid,p2paid,raw,after,debtor,creditor,debtorP,repaid,monthReps,maxPaid:Math.max(p1paid,p2paid,1)};
 }
 
-// ── Login ─────────────────────────────────────────────────────────────────────
-function Login(){
-  const [pw,setPw]=useState(""); const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
-  async function go(){
-    if(!pw) return; setBusy(true); setErr("");
-    try{ await fb.signIn(pw); }
-    catch{ setErr("Nieprawidłowe hasło."); }
-    finally{ setBusy(false); }
+// ── Actions ───────────────────────────────────────────────────────────────────
+function navTo(v){ STATE.form=defForm(); STATE.editId=null; setState({view:v}); }
+function prevMonth(){ const d=new Date(STATE.fY,STATE.fM-1); setState({fM:d.getMonth(),fY:d.getFullYear()}); }
+function nextMonth(){ const d=new Date(STATE.fY,STATE.fM+1); setState({fM:d.getMonth(),fY:d.getFullYear()}); }
+function setForm(k,v){ STATE.form[k]=v; render(); }
+function setRecForm(k,v){ STATE.recForm[k]=v; render(); }
+function toggleFormExclude(){ setForm("excludeFromSettlement",!STATE.form.excludeFromSettlement); }
+
+function doLogin(){
+  const pw = el("loginPw")?.value?.trim();
+  if(!pw) return;
+  el("loginBtn").innerHTML="<span class='sp' style='border-top-color:#0f172a'></span> Logowanie…";
+  auth.signInWithEmailAndPassword("budzet@domowy.pl", pw)
+    .catch(()=>{ render(); setTimeout(()=>{ const e=el("loginErr"); if(e){e.textContent="⚠️ Nieprawidłowe hasło.";e.classList.remove("hide");} },50); });
+}
+
+function saveNames(){
+  const n0=el("n0")?.value||STATE.names[0]; const n1=el("n1")?.value||STATE.names[1];
+  const names=[n0,n1]; fbSet("names",names); setState({names,editNames:false});
+}
+
+function addOrUpdate(){
+  const f=STATE.form; if(!f.amount||isNaN(+f.amount)) return;
+  const tx={...f,amount:+f.amount,id:STATE.editId||Date.now()};
+  fbSet(`transactions/${tx.id}`,tx);
+  setState({form:defForm(),editId:null});
+}
+
+function startEdit(id){
+  const tx=STATE.txs.find(t=>t.id===id); if(!tx) return;
+  setState({form:{...tx},editId:id,view:"add"});
+}
+
+function toggleExclude(id){
+  const tx=STATE.txs.find(t=>t.id===id); if(!tx) return;
+  fbSet(`transactions/${tx.id}`,{...tx,excludeFromSettlement:!tx.excludeFromSettlement});
+}
+
+function addRepayment(){
+  const amt=+STATE.repAmt; if(!amt||amt<=0) return;
+  const r={id:Date.now(),amount:amt,from:STATE.repFrom,date:new Date().toISOString().slice(0,10),month:STATE.fM,year:STATE.fY};
+  fbSet(`repayments/${r.id}`,r); setState({repAmt:""});
+}
+
+function toggleExclCat(cat,isExStr){
+  const isEx=isExStr==="true";
+  const excl=Array.isArray(STATE.excl)?[...STATE.excl]:[];
+  const newExcl=isEx?excl.filter(c=>c!==cat):[...excl,cat];
+  fbSet("excludedCats",newExcl);
+}
+
+function saveRecurring(){
+  const f=STATE.recForm; if(!f.name||!f.amount||isNaN(+f.amount)) return;
+  const id=STATE.recEditId||Date.now();
+  fbSet(`recurring/${id}`,{...f,amount:+f.amount,id,active:true});
+  injectRecurring({...f,amount:+f.amount,id,active:true});
+  setState({recForm:defRecForm(),recEditId:null});
+}
+
+function editRecurring(id){
+  const r=STATE.recurring.find(x=>x.id==id); if(!r) return;
+  setState({recForm:{...r},recEditId:r.id});
+}
+
+function toggleRecurring(id){
+  const r=STATE.recurring.find(x=>x.id==id); if(!r) return;
+  fbSet(`recurring/${id}`,{...r,active:!r.active});
+  if(r.active){
+    const key=`rec_${id}_${STATE.fY}_${STATE.fM}`;
+    const tx=STATE.txs.find(t=>t.recurringKey===key);
+    if(tx) fbDel(`transactions/${tx.id}`);
+  } else {
+    injectRecurring({...r,active:true});
   }
-  return html`
-    <div style=${{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:C.bg}}>
-      <div class="fa" style=${{width:"100%",maxWidth:340}}>
-        <div style=${{textAlign:"center",marginBottom:28}}>
-          <div style=${{fontSize:52}}>💰</div>
-          <div style=${{fontSize:22,fontWeight:800,color:C.acc,marginTop:8}}>Budżet Domowy</div>
-          <div style=${{fontSize:13,color:C.mut,marginTop:4}}>Zaloguj się aby uzyskać dostęp</div>
-        </div>
-        <div class="card" style=${{display:"flex",flexDirection:"column",gap:14}}>
-          <div>
-            <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:5}}>Hasło</label>
-            <input class="inp" type="password" placeholder="Wpisz hasło…" value=${pw}
-              onInput=${e=>setPw(e.target.value)} onKeyDown=${e=>e.key==="Enter"&&go()} autoFocus/>
-          </div>
-          ${err&&html`<div style=${{padding:"9px 12px",borderRadius:10,background:"#2d1515",color:"#fca5a5",fontSize:12}}>⚠️ ${err}</div>`}
-          <button onClick=${go} disabled=${busy}
-            style=${{padding:"12px",borderRadius:10,fontWeight:700,background:C.acc,color:"#0f172a",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:busy?.7:1}}>
-            ${busy?html`<span class="spin" style=${{borderTopColor:"#0f172a"}}></span>`:""} 🔓 Zaloguj się
-          </button>
-        </div>
-      </div>
-    </div>`;
+}
+
+function toggleRecExclude(id){
+  const r=STATE.recurring.find(x=>x.id==id); if(!r) return;
+  fbSet(`recurring/${id}`,{...r,excludeFromSettlement:!r.excludeFromSettlement});
+  // Update injected tx for current month
+  const key=`rec_${id}_${STATE.fY}_${STATE.fM}`;
+  const tx=STATE.txs.find(t=>t.recurringKey===key);
+  if(tx) fbSet(`transactions/${tx.id}`,{...tx,excludeFromSettlement:!r.excludeFromSettlement});
+}
+
+function deleteRecurring(id){
+  fbDel(`recurring/${id}`);
+  STATE.txs.filter(t=>t.recurringId==id).forEach(t=>fbDel(`transactions/${t.id}`));
+}
+
+function injectRecurring(r){
+  const key=`rec_${r.id}_${STATE.fY}_${STATE.fM}`;
+  const exists=STATE.txs.find(t=>t.recurringKey===key);
+  if(exists) return;
+  const tx={id:Date.now()+Math.random(),recurringKey:key,recurringId:r.id,type:"expense",amount:+r.amount,category:r.category,person:r.person,description:r.name,day:r.day||1,month:STATE.fM,year:STATE.fY,excludeFromSettlement:!!r.excludeFromSettlement};
+  fbSet(`transactions/${tx.id}`,tx);
 }
 
 // ── Scanner ───────────────────────────────────────────────────────────────────
-function Scanner({onResult,onClose}){
-  const [file,setFile]=useState(null); const [prev,setPrev]=useState(null);
-  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
-  const camRef=useRef(); const galRef=useRef();
-
-  function pickFile(f){
-    if(!f) return;
-    setFile(f); setErr("");
-    const r=new FileReader(); r.onload=e=>setPrev(e.target.result); r.readAsDataURL(f);
-  }
-
-  function parseText(txt){
-    const lines=txt.split(/\n/).map(l=>l.trim()).filter(Boolean);
-    let amount=null;
-    for(const l of lines){
-      const m=l.match(/(?:suma|razem|do\s*zap.aty|total)[^\d]*([\d]+[.,][\d]{2})/i);
-      if(m){amount=parseFloat(m[1].replace(",","."));break;}
-    }
-    if(!amount){
-      const nums=[...txt.matchAll(/([\d]{1,4}[.,][\d]{2})/g)].map(m=>parseFloat(m[1].replace(",",".")));
-      if(nums.length) amount=Math.max(...nums);
-    }
-    let day=null,month=null,year=null;
-    const dm=txt.match(/(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})/)||txt.match(/(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})/);
-    if(dm){ if(dm[3]?.length===4){day=+dm[1];month=+dm[2]-1;year=+dm[3];}else{year=+dm[1];month=+dm[2]-1;day=+dm[3];} }
-    const desc=lines.find(l=>l.length>3&&!/^[\d\s.,*]+$/.test(l))||"";
-    const t=txt.toLowerCase();
-    let cat=CATS[1];
-    if(/biedronka|lidl|aldi|kaufland|żabka|stokrotka|carrefour|netto|dino|spar/.test(t)) cat=CATS[1];
-    else if(/orlen|bp|shell|lotos|circle k|paliwo/.test(t)) cat=CATS[2];
-    else if(/apteka|farmacja|leki/.test(t)) cat=CATS[6];
-    else if(/kino|teatr|cinema/.test(t)) cat=CATS[4];
-    return {amount,day,month,year,description:desc,category:cat};
-  }
-
-  async function scan(){
-    if(!file) return; setBusy(true); setErr("");
-    try{
-      const fd=new FormData();
-      fd.append("file",file); fd.append("apikey","helloworld");
-      fd.append("language","pol"); fd.append("OCREngine","2");
-      const res=await fetch("https://api.ocr.space/parse/image",{method:"POST",body:fd});
-      const d=await res.json();
-      if(d.IsErroredOnProcessing) throw new Error(d.ErrorMessage?.[0]||"Błąd OCR");
-      const txt=d.ParsedResults?.[0]?.ParsedText||"";
-      if(!txt.trim()) throw new Error("Nie udało się odczytać tekstu.");
-      const p=parseText(txt);
-      onResult({...p,amount:p.amount??"",day:p.day??now.getDate(),month:p.month??now.getMonth(),year:p.year??now.getFullYear(),type:"expense",person:PERSONS[0]});
-    }catch(e){setErr("Błąd: "+e.message);}
-    finally{setBusy(false);}
-  }
-
-  return html`
-    <div onClick=${e=>e.target===e.currentTarget&&onClose()} style=${{position:"fixed",inset:0,background:"#000000cc",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div class="card fa" style=${{width:"100%",maxWidth:420,maxHeight:"90vh",overflowY:"auto",display:"flex",flexDirection:"column",gap:14}}>
-        <div style=${{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <b style=${{fontSize:16}}>🧾 Skan paragonu</b>
-          <button onClick=${onClose} style=${{color:C.mut,fontSize:22}}>✕</button>
-        </div>
-        <div style=${{padding:"8px 12px",borderRadius:10,background:"#1e3a5f",border:`1px solid ${C.acc}33`,fontSize:11,color:C.acc}}>
-          ℹ️ OCR odczyta tekst i automatycznie wyciągnie kwotę, datę i sklep. Działa za darmo.
-        </div>
-        ${prev
-          ? html`<img src=${prev} style=${{borderRadius:10,objectFit:"contain",maxHeight:200,width:"100%",background:C.bg}}/>`
-          : html`<div style=${{minHeight:120,border:`2px dashed ${C.bdr}`,borderRadius:12,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:C.mut,fontSize:13}}>
-              <span style=${{fontSize:36}}>📷</span><span>Wybierz zdjęcie poniżej</span>
-            </div>`}
-        <div style=${{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-          <button onClick=${()=>camRef.current?.click()} style=${{padding:"10px",borderRadius:10,border:`1px solid ${C.bdr}`,color:C.acc,fontWeight:600,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-            📷 Aparat
-          </button>
-          <button onClick=${()=>galRef.current?.click()} style=${{padding:"10px",borderRadius:10,border:`1px solid ${C.bdr}`,color:C.acc,fontWeight:600,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-            🖼️ Galeria
-          </button>
-        </div>
-        <input ref=${camRef} type="file" accept="image/*" capture="environment" style=${{display:"none"}} onChange=${e=>pickFile(e.target.files?.[0])}/>
-        <input ref=${galRef} type="file" accept="image/*" style=${{display:"none"}} onChange=${e=>pickFile(e.target.files?.[0])}/>
-        ${err&&html`<div style=${{padding:"9px 12px",borderRadius:10,background:"#2d1515",color:"#fca5a5",fontSize:12}}>⚠️ ${err}</div>`}
-        <div style=${{display:"flex",gap:10}}>
-          <button onClick=${onClose} style=${{flex:1,padding:"11px",borderRadius:10,border:`1px solid ${C.bdr}`,color:C.mut,fontWeight:600}}>Anuluj</button>
-          <button onClick=${scan} disabled=${!file||busy}
-            style=${{flex:2,padding:"11px",borderRadius:10,fontWeight:700,background:file&&!busy?C.acc:"#334155",color:file&&!busy?"#0f172a":C.mut,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-            ${busy?html`<span class="spin" style=${{borderTopColor:C.mut}}></span>`:""}
-            ${busy?"Odczytuję…":"🔍 Skanuj paragon"}
-          </button>
-        </div>
-      </div>
-    </div>`;
+function openScanner(){
+  const overlay=document.createElement("div");
+  overlay.id="scanOverlay";
+  overlay.style.cssText=`position:fixed;inset:0;background:#000000cc;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px`;
+  overlay.innerHTML=`<div class="card fa" style="width:100%;max-width:420px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b style="font-size:16px">🧾 Skan paragonu</b>
+      <button onclick="closeScanner()" style="color:${C.mut};font-size:22px">✕</button>
+    </div>
+    <div style="padding:8px 12px;border-radius:10px;background:#1e3a5f;border:1px solid ${C.acc}33;font-size:11px;color:${C.acc}">ℹ️ OCR odczyta tekst i automatycznie wyciągnie kwotę, datę i sklep. Działa za darmo.</div>
+    <div id="scanPreview" style="min-height:120px;border:2px dashed ${C.bdr};border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:${C.mut};font-size:13px">
+      <span style="font-size:36px">📷</span><span>Wybierz zdjęcie poniżej</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="el('camInp').click()" style="padding:10px;border-radius:10px;border:1px solid ${C.bdr};color:${C.acc};font-weight:600;font-size:13px">📷 Aparat</button>
+      <button onclick="el('galInp').click()" style="padding:10px;border-radius:10px;border:1px solid ${C.bdr};color:${C.acc};font-weight:600;font-size:13px">🖼️ Galeria</button>
+    </div>
+    <input id="camInp" type="file" accept="image/*" capture="environment" style="display:none" onchange="scanPickFile(this)"/>
+    <input id="galInp" type="file" accept="image/*" style="display:none" onchange="scanPickFile(this)"/>
+    <div id="scanErr" class="hide" style="padding:9px 12px;border-radius:10px;background:#2d1515;color:#fca5a5;font-size:12px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeScanner()" style="flex:1;padding:11px;border-radius:10px;border:1px solid ${C.bdr};color:${C.mut};font-weight:600">Anuluj</button>
+      <button id="scanBtn" onclick="doScan()" disabled style="flex:2;padding:11px;border-radius:10px;font-weight:700;background:#334155;color:${C.mut};font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px">🔍 Skanuj paragon</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick=e=>{if(e.target===overlay)closeScanner();};
 }
 
-// ── Main App ──────────────────────────────────────────────────────────────────
-function App(){
-  const [authed,setAuthed]=useState(false);
-  const [authDone,setAuthDone]=useState(false);
-  const [view,setView]=useState("dashboard");
-  const [fM,setFM]=useState(now.getMonth());
-  const [fY,setFY]=useState(now.getFullYear());
-  const [names,setNames]=useState(["Osoba 1","Osoba 2"]);
-  const [tmpNames,setTmpNames]=useState(["Osoba 1","Osoba 2"]);
-  const [editNames,setEditNames]=useState(false);
-  const [form,setForm]=useState(DEF());
-  const [editId,setEditId]=useState(null);
-  const [scanner,setScanner]=useState(false);
-  const [flash,setFlash]=useState(false);
-  const [repAmt,setRepAmt]=useState("");
-  const [repFrom,setRepFrom]=useState(PERSONS[0]);
-  const [sync,setSync]=useState("connecting");
-  const [recForm,setRecForm]=useState({name:"",amount:"",category:CATS[4],person:PERSONS[2],day:1,active:true});
-  const [recEdit,setRecEdit]=useState(null);
+function closeScanner(){ el("scanOverlay")?.remove(); }
 
-  const txs      = useFB(authed?"transactions":null,[]);
-  const reps     = useFB(authed?"repayments":null,[]);
-  const excl     = useFB(authed?"excludedCats":null,[]);
-  const fbNames  = useFB(authed?"names":null,null);
-  const recurring = useFB(authed?"recurring":null,[]);
+let scanFile=null;
+function scanPickFile(inp){
+  scanFile=inp.files?.[0]; if(!scanFile) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    const prev=el("scanPreview");
+    if(prev) prev.innerHTML=`<img src="${e.target.result}" style="max-height:200px;border-radius:8px;object-fit:contain;width:100%"/>`;
+    const btn=el("scanBtn");
+    if(btn){btn.disabled=false;btn.style.background=C.acc;btn.style.color="#0f172a";}
+  };
+  r.readAsDataURL(scanFile);
+}
 
-  // Auth listener
-  useEffect(()=>fb.onAuth(u=>{setAuthed(!!u);setAuthDone(true);}),[]);
-
-  // Sync status
-  useEffect(()=>{if(authed)setSync("connected");},[txs]);
-
-  // Sync names from Firebase
-  useEffect(()=>{ if(fbNames&&Array.isArray(fbNames)){ setNames(fbNames); setTmpNames(fbNames); } },[fbNames]);
-
-  const filtered = txs.filter(t=>t.month===fM&&t.year===fY);
-
-  async function fbSet(path,val){ setSync("syncing"); try{await fb.set(path,val);setSync("connected");}catch{setSync("offline");} }
-  async function fbDel(path){ setSync("syncing"); try{await fb.del(path);setSync("connected");}catch{setSync("offline");} }
-
-  async function addOrUpdate(){
-    if(!form.amount||isNaN(+form.amount)) return;
-    const tx={...form,amount:+form.amount,id:editId||Date.now()};
-    await fbSet(`transactions/${tx.id}`,tx);
-    setForm(DEF()); setEditId(null);
+async function doScan(){
+  if(!scanFile) return;
+  const btn=el("scanBtn"); if(btn){btn.disabled=true;btn.innerHTML="<span class='sp'></span> Odczytuję…";}
+  const errEl=el("scanErr");
+  try{
+    const fd=new FormData();
+    fd.append("file",scanFile); fd.append("apikey","helloworld"); fd.append("language","pol"); fd.append("OCREngine","2");
+    const res=await fetch("https://api.ocr.space/parse/image",{method:"POST",body:fd});
+    const d=await res.json();
+    if(d.IsErroredOnProcessing) throw new Error(d.ErrorMessage?.[0]||"Błąd OCR");
+    const txt=d.ParsedResults?.[0]?.ParsedText||"";
+    if(!txt.trim()) throw new Error("Nie udało się odczytać tekstu.");
+    const p=parseOCR(txt);
+    closeScanner(); scanFile=null;
+    STATE.form={...STATE.form,...p,type:"expense",person:PERSONS[0]};
+    STATE.scanFlash=true; setState({view:"add"});
+    setTimeout(()=>setState({scanFlash:false}),1800);
+  }catch(e){
+    if(errEl){errEl.textContent="⚠️ Błąd: "+e.message;errEl.classList.remove("hide");}
+    if(btn){btn.disabled=false;btn.style.background=C.acc;btn.style.color="#0f172a";btn.innerHTML="🔍 Spróbuj ponownie";}
   }
+}
 
-  async function addRepayment(){
-    if(!repAmt||+repAmt<=0) return;
-    const r={id:Date.now(),amount:+repAmt,from:repFrom,date:now.toISOString().slice(0,10),month:fM,year:fY};
-    await fbSet(`repayments/${r.id}`,r);
-    setRepAmt("");
+function parseOCR(txt){
+  const lines=txt.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  let amount=null;
+  for(const l of lines){
+    const m=l.match(/(?:suma|razem|do\s*zap.aty|total)[^\d]*([\d]+[.,][\d]{2})/i);
+    if(m){amount=parseFloat(m[1].replace(",","."));break;}
   }
+  if(!amount){const nums=[...txt.matchAll(/([\d]{1,4}[.,][\d]{2})/g)].map(m=>parseFloat(m[1].replace(",",".")));if(nums.length)amount=Math.max(...nums);}
+  let day=null,month=null,year=null;
+  const dm=txt.match(/(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})/)||txt.match(/(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})/);
+  if(dm){if(dm[3]?.length===4){day=+dm[1];month=+dm[2]-1;year=+dm[3];}else{year=+dm[1];month=+dm[2]-1;day=+dm[3];}}
+  const desc=lines.find(l=>l.length>3&&!/^[\d\s.,*]+$/.test(l))||"";
+  const t=txt.toLowerCase();
+  let cat=CATS[1];
+  if(/biedronka|lidl|aldi|kaufland|żabka|stokrotka|carrefour|netto|dino|spar/.test(t)) cat=CATS[1];
+  else if(/orlen|bp|shell|lotos|circle k|paliwo/.test(t)) cat=CATS[2];
+  else if(/apteka|farmacja|leki/.test(t)) cat=CATS[6];
+  else if(/kino|teatr|cinema/.test(t)) cat=CATS[4];
+  return {amount:amount??"",day:day??now.getDate(),month:month??now.getMonth(),year:year??now.getFullYear(),description:desc,category:cat};
+}
 
-  function navTo(v){ setView(v); if(v==="add"){setForm(DEF());setEditId(null);} }
-  function startEdit(tx){ setForm({...tx});setEditId(tx.id);setView("add"); }
-  function handleScan(r){ setForm(f=>({...f,...r}));setScanner(false);setView("add");setFlash(true);setTimeout(()=>setFlash(false),1800); }
-
-  // Settlement calc
-  function calcSettlement(){
-    const inScope=t=>!t.excludeFromSettlement&&(Array.isArray(excl)?!excl.includes(t.category):true);
-    const p1o=filtered.filter(t=>t.type==="expense"&&t.person===PERSONS[0]&&inScope(t)).reduce((s,t)=>s+t.amount,0);
-    const p2o=filtered.filter(t=>t.type==="expense"&&t.person===PERSONS[1]&&inScope(t)).reduce((s,t)=>s+t.amount,0);
-    const sh=filtered.filter(t=>t.type==="expense"&&t.person==="Wspólne"&&inScope(t)).reduce((s,t)=>s+t.amount,0);
-    const total=p1o+p2o+sh;
-    if(!total) return null;
-    const fair=total/2;
-    const p1paid=p1o+sh/2; const p2paid=p2o+sh/2;
-    const p1bal=p1paid-fair;
-    const debtor=p1bal<0?names[0]:names[1];
-    const debtorP=p1bal<0?PERSONS[0]:PERSONS[1];
-    const creditor=p1bal<0?names[1]:names[0];
-    const raw=Math.abs(p1bal);
-    const monthReps=reps.filter(r=>r.month===fM&&r.year===fY);
-    const repaid=monthReps.filter(r=>r.from===debtorP).reduce((s,r)=>s+r.amount,0);
-    const after=Math.max(0,raw-repaid);
-    return {p1o,p2o,sh,total,p1paid,p2paid,raw,after,debtor,creditor,debtorP,repaid,monthReps,maxPaid:Math.max(p1paid,p2paid,1)};
-  }
-
-  // Auto-inject active recurring items as transactions for current month
-  useEffect(()=>{
-    if(!authed||!recurring.length) return;
-    const active=recurring.filter(r=>r.active);
-    active.forEach(async r=>{
-      // Check if already injected this month
-      const key=`rec_${r.id}_${fY}_${fM}`;
-      const exists=txs.find(t=>t.recurringKey===key);
-      if(!exists){
-        const tx={
-          id: Date.now()+Math.random(),
-          recurringKey: key,
-          recurringId: r.id,
-          type:"expense",
-          amount:+r.amount,
-          category:r.category,
-          person:r.person,
-          description:r.name,
-          day:r.day||1,
-          month:fM,
-          year:fY,
-          excludeFromSettlement:!!r.excludeFromSettlement,
-        };
-        await fbSet(`transactions/${tx.id}`,tx);
-      }
+// ── Firebase listeners ────────────────────────────────────────────────────────
+auth.onAuthStateChanged(user=>{
+  STATE.authed=!!user; STATE.authChecked=true;
+  if(user){
+    db.ref("transactions").on("value",s=>setState({txs:s.val()?Object.values(s.val()):[],syncStatus:"connected"}));
+    db.ref("repayments").on("value",s=>setState({reps:s.val()?Object.values(s.val()):[]}));
+    db.ref("excludedCats").on("value",s=>setState({excl:s.val()||[]}));
+    db.ref("recurring").on("value",s=>{
+      const rec=s.val()?Object.values(s.val()):[];
+      STATE.recurring=rec;
+      // Auto-inject active recurring for current month
+      rec.filter(r=>r.active).forEach(r=>injectRecurring(r));
+      render();
     });
-  },[authed,recurring,fM,fY]);
-
-  async function saveRecurring(){
-    if(!recForm.name||!recForm.amount||isNaN(+recForm.amount)) return;
-    const id=recEdit||Date.now();
-    await fbSet(`recurring/${id}`,{...recForm,amount:+recForm.amount,id,active:true});
-    setRecForm({name:"",amount:"",category:CATS[4],person:PERSONS[2],day:1,active:true});
-    setRecEdit(null);
+    db.ref("names").on("value",s=>{ if(s.val()&&Array.isArray(s.val())) setState({names:s.val()}); });
+  } else {
+    render();
   }
-
-  async function toggleRecurring(r){
-    await fbSet(`recurring/${r.id}`,{...r,active:!r.active});
-    // Remove injected tx for current month if deactivating
-    if(r.active){
-      const key=`rec_${r.id}_${fY}_${fM}`;
-      const tx=txs.find(t=>t.recurringKey===key);
-      if(tx) await fbDel(`transactions/${tx.id}`);
-    }
-  }
-
-  async function deleteRecurring(r){
-    await fbDel(`recurring/${r.id}`);
-    // Remove all injected txs for this recurring item
-    txs.filter(t=>t.recurringId===r.id).forEach(t=>fbDel(`transactions/${t.id}`));
-  }
-
-
-    const m={};
-    filtered.filter(t=>t.type==="expense").forEach(t=>{m[t.category]=(m[t.category]||0)+t.amount;});
-    return Object.entries(m).map(([name,v])=>({name,v})).sort((a,b)=>b.v-a.v);
-  }
-
-  function monthly6(){
-    return Array.from({length:6},(_,i)=>{
-      const d=new Date(fY,fM-i,1);
-      const arr=txs.filter(t=>t.month===d.getMonth()&&t.year===d.getFullYear());
-      const tot=totals(arr);
-      return {name:MONTHS[d.getMonth()].slice(0,3),inc:tot.inc,exp:tot.exp};
-    }).reverse();
-  }
-
-  const tot=totals(filtered);
-  const cd=catData();
-  const settle=calcSettlement();
-
-  // adjusted balance
-  const monthRepsAll=reps.filter(r=>r.month===fM&&r.year===fY);
-  const totalRepaidAll=settle?monthRepsAll.filter(r=>r.from===settle.debtorP).reduce((s,r)=>s+r.amount,0):0;
-  const adjustedBalance=(tot.inc-tot.exp)+totalRepaidAll;
-
-  // Sync badge
-  const syncColor={connected:"#22c55e",syncing:"#f59e0b",offline:"#ef4444",connecting:"#94a3b8"}[sync]||"#94a3b8";
-  const syncLabel={connected:"Zsynchronizowano",syncing:"Synchronizacja…",offline:"Offline",connecting:"Łączenie…"}[sync]||"";
-
-  const navItems=[["dashboard","📊"],["transactions","📋"],["stats","📈"],["add","➕"],["recurring","🔄"],["settings","⚙️"]];
-  const navLabels={dashboard:"Przegląd",transactions:"Transakcje",stats:"Wykresy",add:"Dodaj",recurring:"Cykliczne",settings:"Ustawienia"};
-
-  const tag=(col,txt)=>html`<span style=${{fontSize:11,fontWeight:600,color:col,padding:"2px 7px",borderRadius:6,background:col+"22"}}>${txt}</span>`;
-
-  if(!authDone) return html`
-    <div style=${{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",gap:14,color:C.mut}}>
-      <span style=${{width:32,height:32,border:`3px solid ${C.bdr}`,borderTopColor:C.acc,borderRadius:"50%",display:"inline-block",animation:"spin .8s linear infinite"}}></span>
-      <span style=${{fontSize:14}}>Ładowanie…</span>
-    </div>`;
-
-  if(!authed) return html`<${Login}/>`;
-
-  return html`
-    <div style=${{background:C.bg,minHeight:"100vh",paddingBottom:24}}>
-      ${scanner&&html`<${Scanner} onResult=${handleScan} onClose=${()=>setScanner(false)}/>`}
-
-      <!-- Header -->
-      <div style=${{background:C.card,borderBottom:`1px solid ${C.bdr}`,padding:"11px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:10}}>
-        <div>
-          <div style=${{fontWeight:800,fontSize:16,color:C.acc}}>💰 Budżet Domowy</div>
-          <div style=${{display:"flex",alignItems:"center",gap:5,fontSize:11,color:syncColor,marginTop:2}}>
-            <span style=${{width:6,height:6,borderRadius:"50%",background:syncColor,display:"inline-block",animation:sync==="syncing"?"pulse 1.2s infinite":undefined}}></span>
-            ${syncLabel}
-          </div>
-        </div>
-        ${editNames
-          ? html`<div style=${{display:"flex",gap:6,alignItems:"center"}}>
-              <input class="inp" value=${tmpNames[0]} onInput=${e=>setTmpNames([e.target.value,tmpNames[1]])} style=${{width:74,fontSize:12,padding:"6px 8px"}}/>
-              <input class="inp" value=${tmpNames[1]} onInput=${e=>setTmpNames([tmpNames[0],e.target.value])} style=${{width:74,fontSize:12,padding:"6px 8px"}}/>
-              <button onClick=${()=>{fbSet("names",tmpNames);setNames(tmpNames);setEditNames(false);}} style=${{background:C.acc,color:"#0f172a",borderRadius:6,padding:"6px 10px",fontWeight:700,fontSize:12}}>✓</button>
-              <button onClick=${()=>setEditNames(false)} style=${{background:"#334155",color:C.mut,borderRadius:6,padding:"6px 8px"}}>✕</button>
-            </div>`
-          : html`<div style=${{display:"flex",gap:10,alignItems:"center"}}>
-              <button onClick=${()=>{setTmpNames(names);setEditNames(true);}} style=${{color:C.mut,fontSize:12}}>✏️ Imiona</button>
-              <button onClick=${()=>fb.signOut()} style=${{color:"#ef444488",fontSize:13}} title="Wyloguj">🔒</button>
-            </div>`}
-      </div>
-
-      <!-- Month nav -->
-      <div style=${{background:C.card,borderBottom:`1px solid ${C.bdr}`,padding:"8px 16px",display:"flex",alignItems:"center"}}>
-        <button onClick=${()=>{const d=new Date(fY,fM-1);setFM(d.getMonth());setFY(d.getFullYear());}} style=${{color:C.mut,fontSize:22,padding:"0 8px"}}>‹</button>
-        <span style=${{flex:1,textAlign:"center",fontWeight:700,fontSize:14}}>${MONTHS[fM]} ${fY}</span>
-        <button onClick=${()=>{const d=new Date(fY,fM+1);setFM(d.getMonth());setFY(d.getFullYear());}} style=${{color:C.mut,fontSize:22,padding:"0 8px"}}>›</button>
-      </div>
-
-      <!-- Nav tabs -->
-      <div style=${{display:"flex",borderBottom:`1px solid ${C.bdr}`,background:C.card}}>
-        ${navItems.map(([v,ico])=>html`
-          <button key=${v} onClick=${()=>navTo(v)}
-            style=${{flex:1,padding:"8px 0 6px",fontSize:11,fontWeight:600,color:view===v?C.acc:C.mut,
-              borderBottom:view===v?`2px solid ${C.acc}`:"2px solid transparent",background:"transparent",transition:"color .15s"}}>
-            <div style=${{fontSize:17}}>${ico}</div>
-            <div>${navLabels[v]}</div>
-          </button>`)}
-      </div>
-
-      <div style=${{padding:14,maxWidth:520,margin:"0 auto"}}>
-
-        <!-- DASHBOARD -->
-        ${view==="dashboard"&&html`<div class="fa" style=${{display:"flex",flexDirection:"column",gap:12}}>
-          <!-- Summary -->
-          <div style=${{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-            ${[["↑ Przychody",tot.inc,C.inc],["↓ Wydatki",tot.exp,C.exp],["= Bilans",adjustedBalance,adjustedBalance>=0?C.inc:C.exp]].map(([l,v,col])=>html`
-              <div key=${l} class="card" style=${{padding:12}}>
-                <div style=${{fontSize:10,color:C.mut,marginBottom:4}}>${l}</div>
-                <div style=${{fontWeight:700,fontSize:13,color:col}}>${fmt(v)}</div>
-              </div>`)}
-          </div>
-
-          <!-- Per person -->
-          <div class="card">
-            <div style=${{fontWeight:600,fontSize:13,color:C.mut,marginBottom:12}}>Podział per osoba</div>
-            ${(()=>{
-              const monthRepsP=reps.filter(r=>r.month===fM&&r.year===fY);
-              // repayments paid by each person (increases their expenses)
-              const p1rep=monthRepsP.filter(r=>r.from===PERSONS[0]).reduce((s,r)=>s+r.amount,0);
-              const p2rep=monthRepsP.filter(r=>r.from===PERSONS[1]).reduce((s,r)=>s+r.amount,0);
-              return [0,1,2].map(i=>{
-                const col=[C.p1,C.p2,C.sh][i];
-                const label=i<2?names[i]:"Wspólne";
-                const pt=totals(filtered.filter(t=>t.person===PERSONS[i]));
-                // add repayments paid by this person, subtract repayments received
-                const repPaid=i===0?p1rep:i===1?p2rep:0;
-                const repReceived=i===0?p2rep:i===1?p1rep:0;
-                const adjExp=pt.exp+repPaid-repReceived;
-                const hasRep=(repPaid>0||repReceived>0)&&i<2;
-                return html`<div key=${i} style=${{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:i<2?10:0}}>
-                  <div style=${{display:"flex",alignItems:"center",gap:8}}>
-                    <div style=${{width:8,height:8,borderRadius:"50%",background:col}}></div>
-                    <span style=${{fontSize:14}}>${label}</span>
-                  </div>
-                  <div style=${{textAlign:"right"}}>
-                    <div style=${{fontSize:11,color:C.inc}}>+${fmt(pt.inc)}</div>
-                    <div style=${{fontSize:11,color:C.exp,display:"flex",alignItems:"center",gap:4,justifyContent:"flex-end"}}>
-                      -${fmt(adjExp)}
-                      ${hasRep&&html`<span style=${{fontSize:10,color:C.mut,fontStyle:"italic"}}>(${repPaid>0?"+":""}${fmt(repPaid-repReceived)} spłata)</span>`}
-                    </div>
-                  </div>
-                </div>`;
-              });
-            })()}
-          </div>
-
-          <!-- Settlement -->
-          ${settle&&html`<div class="card">
-            <div style=${{fontWeight:700,fontSize:13,marginBottom:12}}>⚖️ Rozliczenie wydatków</div>
-            <!-- bars -->
-            <div style=${{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
-              ${[{name:names[0],own:settle.p1o,paid:settle.p1paid,col:C.p1},{name:names[1],own:settle.p2o,paid:settle.p2paid,col:C.p2}].map(p=>html`
-                <div key=${p.name}>
-                  <div style=${{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:12}}>
-                    <div style=${{display:"flex",alignItems:"center",gap:6}}>
-                      <div style=${{width:8,height:8,borderRadius:"50%",background:p.col}}></div>
-                      <b>${p.name}</b>
-                    </div>
-                    <div style=${{color:C.mut}}>własne: <span style=${{color:C.exp}}>${fmt(p.own)}</span> · łącznie: <b style=${{color:C.txt}}>${fmt(p.paid)}</b></div>
-                  </div>
-                  <div style=${{height:6,borderRadius:4,background:"#334155"}}>
-                    <div style=${{height:6,borderRadius:4,background:p.col,width:`${(p.paid/settle.maxPaid)*100}%`,transition:"width .4s"}}></div>
-                  </div>
-                </div>`)}
-            </div>
-            ${settle.sh>0&&html`<div style=${{fontSize:11,color:C.mut,marginBottom:10,padding:"6px 10px",background:"#334155",borderRadius:8}}>
-              Wydatki wspólne ${fmt(settle.sh)} podzielone po ${fmt(settle.sh/2)} na osobę
-            </div>`}
-            <!-- verdict -->
-            ${settle.raw>0.01
-              ? html`<div style=${{padding:"12px 14px",borderRadius:12,background:"linear-gradient(135deg,#1e3a5f,#1e293b)",border:`1px solid ${C.acc}44`,marginBottom:12}}>
-                  <div style=${{fontSize:11,color:C.mut,textAlign:"center",marginBottom:4}}>Do wyrównania</div>
-                  <div style=${{fontSize:15,fontWeight:700,color:C.acc,textAlign:"center",marginBottom:4}}>${settle.debtor} → ${settle.creditor}</div>
-                  ${settle.repaid>0&&html`<div style=${{display:"flex",justifyContent:"space-between",fontSize:11,color:C.mut,padding:"4px 0",borderTop:`1px solid ${C.bdr}`,marginBottom:4}}>
-                    <span>Pierwotny dług:</span><span style=${{textDecoration:"line-through"}}>${fmt(settle.raw)}</span>
-                  </div>`}
-                  ${settle.repaid>0&&html`<div style=${{display:"flex",justifyContent:"space-between",fontSize:11,color:C.inc,marginBottom:6}}>
-                    <span>Spłacono:</span><span>- ${fmt(settle.repaid)}</span>
-                  </div>`}
-                  <div style=${{fontSize:settle.after<0.01?18:24,fontWeight:800,color:settle.after<0.01?C.inc:"#fff",textAlign:"center"}}>
-                    ${settle.after<0.01?"✅ Dług spłacony!":fmt(settle.after)}
-                  </div>
-                </div>`
-              : html`<div style=${{padding:"10px",borderRadius:12,background:"#14532d33",border:"1px solid #22c55e44",textAlign:"center",fontSize:13,fontWeight:600,color:C.inc,marginBottom:12}}>
-                  ✅ Wydatki są równo podzielone
-                </div>`}
-            <!-- add repayment -->
-            ${settle.raw>0.01&&settle.after>0.01&&html`<div style=${{borderTop:`1px solid ${C.bdr}`,paddingTop:12}}>
-              <div style=${{fontSize:12,fontWeight:600,color:C.mut,marginBottom:8}}>💸 Zarejestruj spłatę</div>
-              <div style=${{display:"flex",gap:8,marginBottom:8}}>
-                ${[0,1].map(i=>html`<button key=${i} onClick=${()=>setRepFrom(PERSONS[i])}
-                  style=${{flex:1,padding:"7px",borderRadius:8,fontSize:11,fontWeight:700,border:`2px solid ${[C.p1,C.p2][i]}`,background:repFrom===PERSONS[i]?[C.p1,C.p2][i]:"transparent",color:repFrom===PERSONS[i]?"#fff":[C.p1,C.p2][i]}}>
-                  ${names[i]} płaci
-                </button>`)}
-              </div>
-              <div style=${{display:"flex",gap:8}}>
-                <input class="inp" type="number" min="0" step="0.01" placeholder="Kwota PLN" value=${repAmt} onInput=${e=>setRepAmt(e.target.value)} style=${{flex:1}}/>
-                <button onClick=${addRepayment} style=${{padding:"10px 14px",borderRadius:10,fontWeight:700,background:C.inc,color:"#fff",fontSize:13,whiteSpace:"nowrap"}}>✓ Dodaj</button>
-              </div>
-            </div>`}
-            <!-- repayment history -->
-            ${settle.monthReps.length>0&&html`<div style=${{borderTop:`1px solid ${C.bdr}`,paddingTop:12,marginTop:12}}>
-              <div style=${{fontSize:12,fontWeight:600,color:C.mut,marginBottom:8}}>Historia spłat</div>
-              ${settle.monthReps.sort((a,b)=>b.id-a.id).map(r=>{
-                const fi=PERSONS.indexOf(r.from); const fn=fi>=0?names[fi]:r.from; const tn=names[fi===0?1:0];
-                return html`<div key=${r.id} style=${{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 10px",borderRadius:8,background:C.bg,marginBottom:6}}>
-                  <div style=${{fontSize:12}}>
-                    <b style=${{color:C.inc}}>${fn}</b><span style=${{color:C.mut}}> → </span><b>${tn}</b>
-                    <span style=${{fontSize:10,color:C.mut,marginLeft:6}}>${r.date}</span>
-                  </div>
-                  <div style=${{display:"flex",alignItems:"center",gap:8}}>
-                    <b style=${{color:C.inc}}>${fmt(r.amount)}</b>
-                    <button onClick=${()=>fbDel(`repayments/${r.id}`)} style=${{color:C.mut,fontSize:13}}>🗑️</button>
-                  </div>
-                </div>`;
-              })}
-            </div>`}
-          </div>`}
-
-          <!-- Top cats -->
-          ${cd.length>0&&html`<div class="card">
-            <div style=${{fontWeight:600,fontSize:13,color:C.mut,marginBottom:12}}>Top kategorie wydatków</div>
-            ${cd.slice(0,5).map((c,i)=>html`
-              <div key=${c.name} style=${{marginBottom:10}}>
-                <div style=${{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
-                  <span>${c.name}</span><b style=${{color:C.exp}}>${fmt(c.v)}</b>
-                </div>
-                <div style=${{height:5,borderRadius:4,background:"#334155"}}>
-                  <div style=${{height:5,borderRadius:4,background:CC[i],width:`${(c.v/cd[0].v)*100}%`,transition:"width .4s"}}></div>
-                </div>
-              </div>`)}
-          </div>`}
-        </div>`}
-
-        <!-- TRANSACTIONS -->
-        ${view==="transactions"&&html`<div class="fa" style=${{display:"flex",flexDirection:"column",gap:10}}>
-          ${filtered.length===0&&html`<div style=${{textAlign:"center",padding:"60px 0",color:C.mut}}>
-            <div style=${{fontSize:44,marginBottom:8}}>📂</div>
-            <div style=${{marginBottom:8}}>Brak transakcji w tym miesiącu</div>
-            <button onClick=${()=>navTo("add")} style=${{color:C.acc,fontSize:13,textDecoration:"underline"}}>Dodaj pierwszą</button>
-          </div>`}
-          ${[...filtered].sort((a,b)=>(b.day||1)-(a.day||1)||b.id-a.id).map(tx=>{
-            const pi=PERSONS.indexOf(tx.person); const pc=[C.p1,C.p2,C.sh][pi]||C.mut; const pn=pi<2?names[pi]:"Wspólne";
-            const isExcluded=!!tx.excludeFromSettlement;
-            return html`<div key=${tx.id} class="card" style=${{padding:12,border:`1px solid ${isExcluded?"#8b5cf644":C.bdr}`}}>
-              <div style=${{display:"flex",alignItems:"center",gap:12}}>
-                <div style=${{fontSize:24}}>${tx.category.split(" ")[0]}</div>
-                <div style=${{flex:1,minWidth:0}}>
-                  <div style=${{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>${tx.description||tx.category.split(" ").slice(1).join(" ")}</div>
-                  <div style=${{display:"flex",gap:6,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
-                    ${tx.day&&tag(C.acc,`${tx.day} ${MONTHS[tx.month]?.slice(0,3)}`)}
-                    ${tag(pc,pn)}
-                    ${isExcluded&&tag("#8b5cf6","poza rozliczeniem")}
-                  </div>
-                </div>
-                <div style=${{textAlign:"right",flexShrink:0}}>
-                  <div style=${{fontWeight:700,fontSize:13,color:tx.type==="income"?C.inc:C.exp}}>${tx.type==="income"?"+":"-"}${fmt(tx.amount)}</div>
-                  <div style=${{display:"flex",gap:6,justifyContent:"flex-end",marginTop:4}}>
-                    <button onClick=${()=>startEdit(tx)} style=${{fontSize:15,opacity:.6}}>✏️</button>
-                    <button onClick=${()=>fbDel(`transactions/${tx.id}`)} style=${{fontSize:15,opacity:.6}}>🗑️</button>
-                  </div>
-                </div>
-              </div>
-              <!-- exclude toggle -->
-              ${tx.type==="expense"&&html`<button
-                onClick=${()=>fbSet(`transactions/${tx.id}`,{...tx,excludeFromSettlement:!isExcluded})}
-                style=${{marginTop:10,width:"100%",padding:"6px",borderRadius:8,fontSize:11,fontWeight:600,
-                  border:`1px solid ${isExcluded?"#8b5cf688":C.bdr}`,
-                  background:isExcluded?"#8b5cf611":"transparent",
-                  color:isExcluded?"#8b5cf6":C.mut,
-                  display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                ${isExcluded?"✅ Poza rozliczeniem — kliknij aby włączyć":"⚖️ Wyklucz z rozliczenia między osobami"}
-              </button>`}
-            </div>`;
-          })}
-        </div>`}
-
-        <!-- STATS -->
-        ${view==="stats"&&html`<div class="fa" style=${{display:"flex",flexDirection:"column",gap:12}}>
-          ${cd.length>0&&html`<div class="card">
-            <div style=${{fontWeight:600,fontSize:13,color:C.mut,marginBottom:12}}>Wydatki wg kategorii</div>
-            <${PieChart} data=${cd}/>
-            <div style=${{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,marginTop:12}}>
-              ${cd.map((c,i)=>html`<div key=${c.name} style=${{display:"flex",alignItems:"center",gap:6,fontSize:11}}>
-                <div style=${{width:8,height:8,borderRadius:2,background:CC[i%15],flexShrink:0}}></div>
-                <span style=${{color:C.mut,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>${c.name.split(" ").slice(1).join(" ")}</span>
-                <b style=${{marginLeft:"auto",flexShrink:0}}>${fmt(c.v)}</b>
-              </div>`)}
-            </div>
-          </div>`}
-          <div class="card">
-            <div style=${{fontWeight:600,fontSize:13,color:C.mut,marginBottom:12}}>Ostatnie 6 miesięcy</div>
-            <${BarChart} data=${monthly6()}/>
-          </div>
-        </div>`}
-
-        <!-- ADD / EDIT -->
-        ${view==="add"&&html`<div class="fa" style=${{display:"flex",flexDirection:"column",gap:12}}>
-          ${!editId&&html`<button onClick=${()=>setScanner(true)}
-            style=${{width:"100%",padding:14,borderRadius:12,fontSize:15,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:10,
-              border:`2px solid ${flash?"#22c55e":C.acc}`,background:flash?"#22c55e22":"transparent",color:flash?"#22c55e":C.acc,boxShadow:`0 0 12px ${C.acc}33`}}>
-            <span style=${{fontSize:22}}>🧾</span>${flash?"✅ Dane odczytane!":"Skanuj paragon"}
-          </button>`}
-          <div class="card" style=${{display:"flex",flexDirection:"column",gap:14}}>
-            <b style=${{fontSize:15}}>${editId?"Edytuj transakcję":"Lub wpisz ręcznie"}</b>
-            <!-- type -->
-            <div style=${{display:"flex",borderRadius:10,overflow:"hidden",border:`1px solid ${C.bdr}`}}>
-              ${[["expense","💸 Wydatek"],["income","💵 Przychód"]].map(([v,l])=>html`
-                <button key=${v} onClick=${()=>setForm(f=>({...f,type:v}))}
-                  style=${{flex:1,padding:"10px",fontWeight:700,fontSize:14,background:form.type===v?(v==="income"?C.inc:C.exp):"transparent",color:form.type===v?"#fff":C.mut}}>
-                  ${l}
-                </button>`)}
-            </div>
-            <!-- amount -->
-            <div>
-              <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:4}}>Kwota (PLN)</label>
-              <input class="inp" type="number" min="0" step="0.01" placeholder="0,00" value=${form.amount} onInput=${e=>setForm(f=>({...f,amount:e.target.value}))}/>
-            </div>
-            <!-- person -->
-            <div>
-              <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:6}}>Kto?</label>
-              <div style=${{display:"flex",gap:8}}>
-                ${PERSONS.map((p,i)=>{const col=[C.p1,C.p2,C.sh][i];const lbl=i<2?names[i]:"Wspólne";
-                  return html`<button key=${p} onClick=${()=>setForm(f=>({...f,person:p}))}
-                    style=${{flex:1,padding:"9px 4px",borderRadius:10,fontSize:12,fontWeight:700,border:`2px solid ${col}`,background:form.person===p?col:"transparent",color:form.person===p?"#fff":col}}>
-                    ${lbl}
-                  </button>`;
-                })}
-              </div>
-            </div>
-            <!-- category -->
-            <div>
-              <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:4}}>Kategoria</label>
-              <select class="inp" value=${form.category} onChange=${e=>setForm(f=>({...f,category:e.target.value}))}>
-                ${CATS.map(c=>html`<option key=${c} value=${c}>${c}</option>`)}
-              </select>
-            </div>
-            <!-- description -->
-            <div>
-              <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:4}}>Opis (opcjonalnie)</label>
-              <input class="inp" type="text" placeholder="np. Biedronka, prąd…" value=${form.description} onInput=${e=>setForm(f=>({...f,description:e.target.value}))}/>
-            </div>
-            <!-- date -->
-            <div style=${{display:"grid",gridTemplateColumns:"1fr 2fr 1fr",gap:8}}>
-              <div>
-                <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:4}}>Dzień</label>
-                <input class="inp" type="number" min="1" max="31" value=${form.day||""} onInput=${e=>setForm(f=>({...f,day:+e.target.value||1}))}/>
-              </div>
-              <div>
-                <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:4}}>Miesiąc</label>
-                <select class="inp" value=${form.month} onChange=${e=>setForm(f=>({...f,month:+e.target.value}))}>
-                  ${MONTHS.map((m,i)=>html`<option key=${i} value=${i}>${m}</option>`)}
-                </select>
-              </div>
-              <div>
-                <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:4}}>Rok</label>
-                <select class="inp" value=${form.year} onChange=${e=>setForm(f=>({...f,year:+e.target.value}))}>
-                  ${[2024,2025,2026,2027].map(y=>html`<option key=${y} value=${y}>${y}</option>`)}
-                </select>
-              </div>
-            </div>
-            <!-- submit -->
-            <div style=${{display:"flex",gap:10}}>
-              <button onClick=${addOrUpdate}
-                style=${{flex:1,padding:"12px",borderRadius:10,fontWeight:700,background:C.acc,color:"#0f172a",fontSize:14}}>
-                ${editId?"💾 Zapisz zmiany":"✅ Dodaj transakcję"}
-              </button>
-              ${editId&&html`<button onClick=${()=>{setEditId(null);setForm(DEF());}}
-                style=${{padding:"12px 16px",borderRadius:10,border:`1px solid ${C.bdr}`,color:C.mut,fontWeight:600}}>Anuluj</button>`}
-            </div>
-          </div>
-        </div>`}
-
-        <!-- RECURRING -->
-        ${view==="recurring"&&html`<div class="fa" style=${{display:"flex",flexDirection:"column",gap:12}}>
-
-          <!-- Summary -->
-          ${recurring.filter(r=>r.active).length>0&&html`<div class="card" style=${{background:"linear-gradient(135deg,#1e293b,#0f2133)",border:`1px solid ${C.acc}33`}}>
-            <div style=${{fontSize:12,color:C.mut,marginBottom:4}}>Łączny koszt miesięczny</div>
-            <div style=${{fontSize:26,fontWeight:800,color:C.acc}}>${fmt(recurring.filter(r=>r.active).reduce((s,r)=>s+ +r.amount,0))}</div>
-            <div style=${{fontSize:11,color:C.mut,marginTop:2}}>${recurring.filter(r=>r.active).length} aktywnych subskrypcji</div>
-          </div>`}
-
-          <!-- Add / Edit form -->
-          <div class="card" style=${{display:"flex",flexDirection:"column",gap:12}}>
-            <div style=${{fontWeight:700,fontSize:14}}>${recEdit?"✏️ Edytuj subskrypcję":"➕ Dodaj subskrypcję"}</div>
-
-            <div>
-              <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:4}}>Nazwa (np. Netflix, Spotify)</label>
-              <input class="inp" type="text" placeholder="Nazwa subskrypcji" value=${recForm.name}
-                onInput=${e=>setRecForm(f=>({...f,name:e.target.value}))}/>
-            </div>
-
-            <div style=${{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <div>
-                <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:4}}>Kwota (PLN)</label>
-                <input class="inp" type="number" min="0" step="0.01" placeholder="0,00" value=${recForm.amount}
-                  onInput=${e=>setRecForm(f=>({...f,amount:e.target.value}))}/>
-              </div>
-              <div>
-                <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:4}}>Dzień miesiąca</label>
-                <input class="inp" type="number" min="1" max="28" placeholder="1-28" value=${recForm.day}
-                  onInput=${e=>setRecForm(f=>({...f,day:+e.target.value||1}))}/>
-              </div>
-            </div>
-
-            <div>
-              <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:4}}>Kategoria</label>
-              <select class="inp" value=${recForm.category} onChange=${e=>setRecForm(f=>({...f,category:e.target.value}))}>
-                ${CATS.map(c=>html`<option key=${c} value=${c}>${c}</option>`)}
-              </select>
-            </div>
-
-            <div>
-              <label style=${{fontSize:11,color:C.mut,fontWeight:600,display:"block",marginBottom:6}}>Kto płaci?</label>
-              <div style=${{display:"flex",gap:8}}>
-                ${PERSONS.map((p,i)=>{const col=[C.p1,C.p2,C.sh][i];const lbl=i<2?names[i]:"Wspólne";
-                  return html`<button key=${p} onClick=${()=>setRecForm(f=>({...f,person:p}))}
-                    style=${{flex:1,padding:"8px 4px",borderRadius:10,fontSize:12,fontWeight:700,border:`2px solid ${col}`,background:recForm.person===p?col:"transparent",color:recForm.person===p?"#fff":col}}>
-                    ${lbl}
-                  </button>`;
-                })}
-              </div>
-            </div>
-
-            <div style=${{display:"flex",gap:8}}>
-              <button onClick=${saveRecurring}
-                style=${{flex:1,padding:"11px",borderRadius:10,fontWeight:700,background:C.acc,color:"#0f172a",fontSize:14}}>
-                ${recEdit?"💾 Zapisz":"✅ Dodaj"}
-              </button>
-              ${recEdit&&html`<button onClick=${()=>{setRecEdit(null);setRecForm({name:"",amount:"",category:CATS[4],person:PERSONS[2],day:1,active:true});}}
-                style=${{padding:"11px 14px",borderRadius:10,border:`1px solid ${C.bdr}`,color:C.mut,fontWeight:600}}>Anuluj</button>`}
-            </div>
-          </div>
-
-          <!-- List -->
-          ${recurring.length===0&&html`<div style=${{textAlign:"center",padding:"40px 0",color:C.mut}}>
-            <div style=${{fontSize:40,marginBottom:8}}>🔄</div>
-            <div>Brak subskrypcji. Dodaj pierwszą powyżej.</div>
-          </div>`}
-
-          ${[...recurring].sort((a,b)=>+b.active- +a.active||a.name.localeCompare(b.name)).map(r=>{
-            const pi=PERSONS.indexOf(r.person); const pc=[C.p1,C.p2,C.sh][pi]||C.mut; const pn=pi<2?names[pi]:"Wspólne";
-            return html`<div key=${r.id} class="card" style=${{opacity:r.active?1:.5,border:`1px solid ${r.active?C.bdr:"#334155"}`}}>
-              <div style=${{display:"flex",alignItems:"center",gap:12}}>
-                <div style=${{fontSize:24}}>${r.category.split(" ")[0]}</div>
-                <div style=${{flex:1,minWidth:0}}>
-                  <div style=${{fontWeight:700,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
-                    ${r.name}
-                    ${!r.active&&html`<span style=${{fontSize:10,color:C.mut,fontWeight:400,padding:"1px 6px",border:`1px solid ${C.bdr}`,borderRadius:4}}>nieaktywna</span>`}
-                  </div>
-                  <div style=${{display:"flex",gap:6,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
-                    ${tag(pc,pn)}
-                    <span style=${{fontSize:11,color:C.mut}}>${r.day}. każdego miesiąca</span>
-                  </div>
-                </div>
-                <div style=${{textAlign:"right",flexShrink:0}}>
-                  <div style=${{fontWeight:800,fontSize:15,color:C.exp}}>-${fmt(r.amount)}</div>
-                  <div style=${{fontSize:10,color:C.mut}}>/ miesiąc</div>
-                </div>
-              </div>
-              <div style=${{display:"flex",gap:8,marginTop:12,paddingTop:10,borderTop:`1px solid ${C.bdr}`}}>
-                <button onClick=${()=>toggleRecurring(r)}
-                  style=${{flex:1,padding:"7px",borderRadius:8,fontSize:12,fontWeight:600,border:`1px solid ${r.active?C.exp:C.inc}`,color:r.active?C.exp:C.inc,background:"transparent"}}>
-                  ${r.active?"⏸ Dezaktywuj":"▶ Aktywuj"}
-                </button>
-                <button onClick=${()=>fbSet(`recurring/${r.id}`,{...r,excludeFromSettlement:!r.excludeFromSettlement})}
-                  style=${{flex:1,padding:"7px",borderRadius:8,fontSize:11,fontWeight:600,
-                    border:`1px solid ${r.excludeFromSettlement?"#8b5cf688":C.bdr}`,
-                    color:r.excludeFromSettlement?"#8b5cf6":C.mut,background:r.excludeFromSettlement?"#8b5cf611":"transparent"}}>
-                  ${r.excludeFromSettlement?"✅ Poza rozliczeniem":"⚖️ Wyklucz"}
-                </button>
-                <button onClick=${()=>{setRecEdit(r.id);setRecForm({...r});}}
-                  style=${{padding:"7px 12px",borderRadius:8,fontSize:12,fontWeight:600,border:`1px solid ${C.bdr}`,color:C.mut,background:"transparent"}}>✏️</button>
-                <button onClick=${()=>deleteRecurring(r)}
-                  style=${{padding:"7px 12px",borderRadius:8,fontSize:12,fontWeight:600,border:"1px solid #ef444444",color:C.exp,background:"transparent"}}>🗑️</button>
-              </div>
-            </div>`;
-          })}
-        </div>`}
-
-        <!-- SETTINGS -->
-        ${view==="settings"&&html`<div class="fa" style=${{display:"flex",flexDirection:"column",gap:12}}>
-          <div class="card">
-            <div style=${{fontWeight:700,fontSize:15,marginBottom:4}}>⚙️ Ustawienia rozliczenia</div>
-            <div style=${{fontSize:12,color:C.mut,marginBottom:16}}>Zaznaczone kategorie <b style=${{color:C.txt}}>nie będą wliczane</b> do wspólnego rozliczenia.</div>
-            <div style=${{display:"flex",flexDirection:"column",gap:8}}>
-              ${CATS.map(cat=>{
-                const ex=Array.isArray(excl)&&excl.includes(cat);
-                const newExcl=ex?(Array.isArray(excl)?excl.filter(c=>c!==cat):[]):[...(Array.isArray(excl)?excl:[]),cat];
-                return html`<button key=${cat} onClick=${()=>fbSet("excludedCats",newExcl)}
-                  style=${{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:12,border:`1px solid ${ex?"#ef444466":C.bdr}`,background:ex?"#2d151522":C.bg}}>
-                  <div style=${{display:"flex",alignItems:"center",gap:10}}>
-                    <span style=${{fontSize:20}}>${cat.split(" ")[0]}</span>
-                    <span style=${{fontSize:14,fontWeight:600,color:ex?C.mut:C.txt}}>${cat.split(" ").slice(1).join(" ")}</span>
-                  </div>
-                  <div style=${{width:22,height:22,borderRadius:6,border:`2px solid ${ex?C.exp:C.bdr}`,background:ex?C.exp:"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    ${ex&&html`<span style=${{color:"#fff",fontSize:13,fontWeight:700}}>✕</span>`}
-                  </div>
-                </button>`;
-              })}
-            </div>
-            ${Array.isArray(excl)&&excl.length>0&&html`<div style=${{marginTop:14,padding:"10px 12px",borderRadius:10,background:"#2d1515",border:"1px solid #ef444433",fontSize:12,color:"#fca5a5"}}>
-              Wykluczone: ${excl.map(c=>c.split(" ")[0]).join(" ")} (${excl.length})
-            </div>`}
-          </div>
-        </div>`}
-
-      </div>
-    </div>`;
-}
-
-render(html`<${App}/>`, document.getElementById("app"));
+});
 </script>
 </body>
 </html>
