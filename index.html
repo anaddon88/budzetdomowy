@@ -399,7 +399,7 @@ function renderAdd(){
         ${[["expense","💸 Wydatek"],["income","💵 Przychód"]].map(([v,l])=>`<button onclick="setForm('type','${v}')" style="flex:1;padding:10px;font-weight:700;font-size:14px;background:${f.type===v?(v==="income"?C.inc:C.exp):"transparent"};color:${f.type===v?"#fff":C.mut}">${l}</button>`).join("")}
       </div>
       <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Kwota (PLN)</label>
-        <input class="inp" type="number" min="0" step="0.01" placeholder="0,00" value="${f.amount}" oninput="setForm('amount',this.value)" id="amtInp"/></div>
+        <input class="inp" type="number" min="0" step="0.01" placeholder="0,00" value="${f.amount}" oninput="STATE.form.amount=this.value" id="amtInp"/></div>
       <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:6px">Kto?</label>
         <div style="display:flex;gap:8px">
           ${PERSONS.map((p,i)=>{const col=[C.p1,C.p2,C.sh][i];const lbl=i<2?s.names[i]:"Wspólne";
@@ -408,10 +408,10 @@ function renderAdd(){
       <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Kategoria</label>
         <select class="inp" onchange="setForm('category',this.value)">${CATS.map(c=>`<option value="${c}" ${f.category===c?"selected":""}>${c}</option>`).join("")}</select></div>
       <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Opis (opcjonalnie)</label>
-        <input class="inp" type="text" placeholder="np. Biedronka, prąd…" value="${f.description||""}" oninput="setForm('description',this.value)"/></div>
+        <input class="inp" type="text" placeholder="np. Biedronka, prąd…" value="${f.description||""}" oninput="STATE.form.description=this.value"/></div>
       <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:8px">
         <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Dzień</label>
-          <input class="inp" type="number" min="1" max="31" value="${f.day||""}" oninput="setForm('day',+this.value||1)"/></div>
+          <input class="inp" type="number" min="1" max="31" value="${f.day||""}" oninput="STATE.form.day=+this.value||1"/></div>
         <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Miesiąc</label>
           <select class="inp" onchange="setForm('month',+this.value)">${MONTHS.map((m,i)=>`<option value="${i}" ${f.month===i?"selected":""}>${m}</option>`).join("")}</select></div>
         <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Rok</label>
@@ -443,12 +443,12 @@ function renderRecurring(){
     <div class="card" style="display:flex;flex-direction:column;gap:12px">
       <b style="font-size:14px">${s.recEditId?"✏️ Edytuj subskrypcję":"➕ Dodaj subskrypcję"}</b>
       <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Nazwa</label>
-        <input class="inp" type="text" placeholder="np. Netflix, Spotify…" value="${f.name||""}" oninput="setRecForm('name',this.value)"/></div>
+        <input class="inp" type="text" placeholder="np. Netflix, Spotify…" value="${f.name||""}" oninput="STATE.recForm.name=this.value"/></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Kwota (PLN)</label>
-          <input class="inp" type="number" min="0" step="0.01" placeholder="0,00" value="${f.amount||""}" oninput="setRecForm('amount',this.value)"/></div>
+          <input class="inp" type="number" min="0" step="0.01" placeholder="0,00" value="${f.amount||""}" oninput="STATE.recForm.amount=this.value"/></div>
         <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Dzień miesiąca</label>
-          <input class="inp" type="number" min="1" max="28" value="${f.day||1}" oninput="setRecForm('day',+this.value||1)"/></div>
+          <input class="inp" type="number" min="1" max="28" value="${f.day||1}" oninput="STATE.recForm.day=+this.value||1"/></div>
       </div>
       <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:4px">Kategoria</label>
         <select class="inp" onchange="setRecForm('category',this.value)">${CATS.map(c=>`<option value="${c}" ${f.category===c?"selected":""}>${c}</option>`).join("")}</select></div>
@@ -551,8 +551,8 @@ function calcSettlement(filtered){
 function navTo(v){ STATE.form=defForm(); STATE.editId=null; setState({view:v}); }
 function prevMonth(){ const d=new Date(STATE.fY,STATE.fM-1); setState({fM:d.getMonth(),fY:d.getFullYear()}); }
 function nextMonth(){ const d=new Date(STATE.fY,STATE.fM+1); setState({fM:d.getMonth(),fY:d.getFullYear()}); }
-function setForm(k,v){ STATE.form[k]=v; render(); }
-function setRecForm(k,v){ STATE.recForm[k]=v; render(); }
+function setForm(k,v,noRender){ STATE.form[k]=v; if(!noRender) render(); }
+function setRecForm(k,v,noRender){ STATE.recForm[k]=v; if(!noRender) render(); }
 function toggleFormExclude(){ setForm("excludeFromSettlement",!STATE.form.excludeFromSettlement); }
 
 function doLogin(){
@@ -564,7 +564,7 @@ function doLogin(){
 }
 
 function saveNames(){
-  const n0=el("n0")?.value||STATE.names[0]; const n1=el("n1")?.value||STATE.names[1];
+  const n0=el("n0")?.value?.trim()||STATE.names[0]; const n1=el("n1")?.value?.trim()||STATE.names[1];
   const names=[n0,n1]; fbSet("names",names); setState({names,editNames:false});
 }
 
