@@ -43,8 +43,7 @@ if("serviceWorker" in navigator) {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html{overflow-y:scroll}
-body{background:#0f172a;color:#f1f5f9;font-family:system-ui,sans-serif;min-height:100vh}
+body{background:#0f172a;color:#f1f5f9;font-family:system-ui,sans-serif;min-height:100vh;overflow-y:scroll;scrollbar-gutter:stable}
 button{cursor:pointer;border:none;background:none;font-family:inherit;font-size:14px}
 input,select{font-family:inherit;font-size:14px}
 select option{background:#1e293b}
@@ -106,16 +105,14 @@ function defRecForm(){ return {name:"",amount:"",category:CATS[4],person:PERSONS
 
 // ── Firebase helpers ──────────────────────────────────────────────────────────
 function fbSet(path,val){
-  let t=setTimeout(()=>setState({syncStatus:"syncing"}),300);
   return db.ref(path).set(val)
-    .then(()=>{clearTimeout(t);setState({syncStatus:"connected"});})
-    .catch(()=>{clearTimeout(t);setState({syncStatus:"offline"});});
+    .then(()=>{ if(STATE.syncStatus!=="connected") setState({syncStatus:"connected"}); })
+    .catch(()=>setState({syncStatus:"offline"}));
 }
 function fbDel(path){
-  let t=setTimeout(()=>setState({syncStatus:"syncing"}),300);
   return db.ref(path).remove()
-    .then(()=>{clearTimeout(t);setState({syncStatus:"connected"});})
-    .catch(()=>{clearTimeout(t);setState({syncStatus:"offline"});});
+    .then(()=>{ if(STATE.syncStatus!=="connected") setState({syncStatus:"connected"}); })
+    .catch(()=>setState({syncStatus:"offline"}));
 }
 
 // ── Render engine ─────────────────────────────────────────────────────────────
@@ -160,8 +157,8 @@ function render(){
   const repaidAll = settle ? monthRepsAll.filter(r=>r.from===settle.debtorP).reduce((a,r)=>a+r.amount,0) : 0;
   const adjBal = (tot.inc - tot.exp) + repaidAll;
 
-  const syncCol = {connected:C.inc,syncing:"#f59e0b",offline:C.exp,connecting:C.mut}[s.syncStatus]||C.mut;
-  const syncLbl = {connected:"Zsynchronizowano",syncing:"Synchronizacja…",offline:"Offline",connecting:"Łączenie…"}[s.syncStatus]||"";
+  const syncCol = {connected:C.inc,offline:C.exp,connecting:C.mut}[s.syncStatus]||C.mut;
+  const syncLbl = {connected:"Zsynchronizowano",offline:"Brak połączenia",connecting:"Łączenie…"}[s.syncStatus]||"";
   const pColors = [C.p1,C.p2,C.sh];
   const navItems = [["dashboard","📊","Przegląd"],["transactions","📋","Transakcje"],["stats","📈","Wykresy"],["add","➕","Dodaj"],["recurring","🔄","Cykliczne"],["settings","⚙️","Ustawienia"]];
 
@@ -173,7 +170,7 @@ function render(){
       <div>
         <div style="font-weight:800;font-size:16px;color:${C.acc}">💰 Budżet Domowy</div>
         <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:${syncCol};margin-top:2px">
-          <span style="width:6px;height:6px;border-radius:50%;background:${syncCol};display:inline-block;${s.syncStatus==='syncing'?'animation:pulse 1.2s infinite':''}"></span>
+          <span style="width:6px;height:6px;border-radius:50%;background:${syncCol};display:inline-block;${s.syncStatus==='connecting'?'animation:pulse 1.2s infinite':''}"></span>
           ${syncLbl}
         </div>
       </div>
