@@ -195,9 +195,11 @@ function render(){
     <!-- Nav tabs -->
     <div style="display:flex;border-bottom:1px solid ${C.bdr};background:${C.card};width:100%;box-sizing:border-box">
       ${navItems.map(([v,ico,lbl])=>`
-        <button onclick="navTo('${v}')" style="flex:1;padding:8px 0 6px;font-size:11px;font-weight:600;
-          color:${s.view===v?C.acc:C.mut};border-bottom:2px solid ${s.view===v?C.acc:'transparent'};background:transparent">
-          <div style="font-size:17px">${ico}</div><div>${lbl}</div>
+        <button onclick="navTo('${v}')" style="flex:1;padding:8px 0 6px;font-size:10px;font-weight:600;
+          color:${s.view===v?C.acc:C.mut};border-bottom:2px solid ${s.view===v?C.acc:'transparent'};background:transparent;
+          min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box">
+          <div style="font-size:18px;line-height:1.2">${ico}</div>
+          <div style="overflow:hidden;text-overflow:ellipsis;padding:0 2px">${lbl}</div>
         </button>`).join("")}
     </div>
 
