@@ -631,7 +631,9 @@ function startEdit(id){
 
 function toggleExclude(id){
   const tx=STATE.txs.find(t=>t.id===id); if(!tx) return;
-  fbSet(`transactions/${tx.id}`,{...tx,excludeFromSettlement:!tx.excludeFromSettlement});
+  tx.excludeFromSettlement=!tx.excludeFromSettlement;
+  render();
+  fbSet(`transactions/${tx.id}`,{...tx});
 }
 
 function addRepayment(){
@@ -644,6 +646,8 @@ function toggleExclCat(cat,isExStr){
   const isEx=isExStr==="true";
   const excl=Array.isArray(STATE.excl)?[...STATE.excl]:[];
   const newExcl=isEx?excl.filter(c=>c!==cat):[...excl,cat];
+  STATE.excl=newExcl;
+  render();
   fbSet("excludedCats",newExcl);
 }
 
@@ -662,8 +666,11 @@ function editRecurring(id){
 
 function toggleRecurring(id){
   const r=STATE.recurring.find(x=>x.id==id); if(!r) return;
-  fbSet(`recurring/${id}`,{...r,active:!r.active});
-  if(r.active){
+  const newActive=!r.active;
+  r.active=newActive;
+  render();
+  fbSet(`recurring/${id}`,{...r,active:newActive});
+  if(!newActive){
     const key=`rec_${id}_${STATE.fY}_${STATE.fM}`;
     const tx=STATE.txs.find(t=>t.recurringKey===key);
     if(tx) fbDel(`transactions/${tx.id}`);
@@ -674,11 +681,16 @@ function toggleRecurring(id){
 
 function toggleRecExclude(id){
   const r=STATE.recurring.find(x=>x.id==id); if(!r) return;
-  fbSet(`recurring/${id}`,{...r,excludeFromSettlement:!r.excludeFromSettlement});
+  const newVal=!r.excludeFromSettlement;
+  // Update local state immediately for instant UI feedback
+  r.excludeFromSettlement=newVal;
+  render();
+  // Then sync to Firebase
+  fbSet(`recurring/${id}`,{...r,excludeFromSettlement:newVal});
   // Update injected tx for current month
   const key=`rec_${id}_${STATE.fY}_${STATE.fM}`;
   const tx=STATE.txs.find(t=>t.recurringKey===key);
-  if(tx) fbSet(`transactions/${tx.id}`,{...tx,excludeFromSettlement:!r.excludeFromSettlement});
+  if(tx){ tx.excludeFromSettlement=newVal; fbSet(`transactions/${tx.id}`,{...tx,excludeFromSettlement:newVal}); }
 }
 
 function deleteRecurring(id){
