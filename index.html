@@ -164,8 +164,9 @@ function render(){
   const pColors = [C.p1,C.p2,C.sh];
   const navItems = [["dashboard","📊","Przegląd"],["transactions","📋","Transakcje"],["stats","📈","Wykresy"],["add","➕","Dodaj"],["recurring","🔄","Cykliczne"],["settings","⚙️","Ustawienia"]];
 
+  const vw = document.documentElement.clientWidth + "px";
   root.innerHTML = `
-  <div style="background:${C.bg};min-height:100vh">
+  <div style="background:${C.bg};min-height:100vh;width:${vw};max-width:${vw};overflow-x:hidden">
 
     <!-- Header -->
     <div style="background:${C.card};border-bottom:1px solid ${C.bdr};padding:11px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;left:0;right:0;box-sizing:border-box;width:100%">
