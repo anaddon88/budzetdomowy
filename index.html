@@ -44,6 +44,7 @@ if("serviceWorker" in navigator) {
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{background:#0f172a;color:#f1f5f9;font-family:system-ui,sans-serif;min-height:100vh}
+html,body{overflow-x:hidden;width:100%;max-width:100vw}
 html{overflow-y:scroll;scrollbar-width:none}
 html::-webkit-scrollbar{display:none}
 button{cursor:pointer;border:none;background:none;font-family:inherit;font-size:14px}
@@ -167,7 +168,7 @@ function render(){
   <div style="background:${C.bg};min-height:100vh">
 
     <!-- Header -->
-    <div style="background:${C.card};border-bottom:1px solid ${C.bdr};padding:11px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10">
+    <div style="background:${C.card};border-bottom:1px solid ${C.bdr};padding:11px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;left:0;right:0;box-sizing:border-box;width:100%">
       <div>
         <div style="font-weight:800;font-size:16px;color:${C.acc}">💰 Budżet Domowy</div>
         <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:${syncCol};margin-top:2px">
@@ -185,14 +186,14 @@ function render(){
     </div>
 
     <!-- Month nav -->
-    <div style="background:${C.card};border-bottom:1px solid ${C.bdr};padding:8px 16px;display:flex;align-items:center">
+    <div style="background:${C.card};border-bottom:1px solid ${C.bdr};padding:8px 16px;display:flex;align-items:center;width:100%;box-sizing:border-box">
       <button onclick="prevMonth()" style="color:${C.mut};font-size:22px;padding:0 8px">‹</button>
       <span style="flex:1;text-align:center;font-weight:700;font-size:14px">${MONTHS[s.fM]} ${s.fY}</span>
       <button onclick="nextMonth()" style="color:${C.mut};font-size:22px;padding:0 8px">›</button>
     </div>
 
     <!-- Nav tabs -->
-    <div style="display:flex;border-bottom:1px solid ${C.bdr};background:${C.card}">
+    <div style="display:flex;border-bottom:1px solid ${C.bdr};background:${C.card};width:100%;box-sizing:border-box">
       ${navItems.map(([v,ico,lbl])=>`
         <button onclick="navTo('${v}')" style="flex:1;padding:8px 0 6px;font-size:11px;font-weight:600;
           color:${s.view===v?C.acc:C.mut};border-bottom:2px solid ${s.view===v?C.acc:'transparent'};background:transparent">
