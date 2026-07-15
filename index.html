@@ -44,7 +44,8 @@ if("serviceWorker" in navigator) {
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{background:#0f172a;color:#f1f5f9;font-family:system-ui,sans-serif;min-height:100vh}
-html{overflow-y:scroll;scrollbar-width:thin;scrollbar-gutter:stable both-edges}
+html{overflow-y:scroll;scrollbar-width:none}
+html::-webkit-scrollbar{display:none}
 button{cursor:pointer;border:none;background:none;font-family:inherit;font-size:14px}
 input,select{font-family:inherit;font-size:14px}
 select option{background:#1e293b}
