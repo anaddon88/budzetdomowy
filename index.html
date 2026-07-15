@@ -43,7 +43,8 @@ if("serviceWorker" in navigator) {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{background:#0f172a;color:#f1f5f9;font-family:system-ui,sans-serif;min-height:100vh;overflow-y:scroll;scrollbar-gutter:stable}
+body{background:#0f172a;color:#f1f5f9;font-family:system-ui,sans-serif;min-height:100vh}
+html{overflow-y:scroll;scrollbar-width:thin;scrollbar-gutter:stable both-edges}
 button{cursor:pointer;border:none;background:none;font-family:inherit;font-size:14px}
 input,select{font-family:inherit;font-size:14px}
 select option{background:#1e293b}
@@ -121,7 +122,6 @@ function setState(patch){ Object.assign(STATE,patch); render(); }
 function render(){
   const s = STATE;
   const root = el("root");
-
   // ── Login ──────────────────────────────────────────────────────────────────
   if(!s.authed){
     root.innerHTML = `
@@ -163,7 +163,7 @@ function render(){
   const navItems = [["dashboard","📊","Przegląd"],["transactions","📋","Transakcje"],["stats","📈","Wykresy"],["add","➕","Dodaj"],["recurring","🔄","Cykliczne"],["settings","⚙️","Ustawienia"]];
 
   root.innerHTML = `
-  <div style="background:${C.bg};min-height:100vh;padding-bottom:24px">
+  <div style="background:${C.bg};min-height:100vh">
 
     <!-- Header -->
     <div style="background:${C.card};border-bottom:1px solid ${C.bdr};padding:11px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10">
@@ -199,7 +199,7 @@ function render(){
         </button>`).join("")}
     </div>
 
-    <div style="padding:14px;max-width:520px;margin:0 auto" class="fa">
+    <div style="padding:14px 14px 32px;max-width:520px;margin:0 auto" class="fa">
       ${renderView(filtered, settle, cd, tot, adjBal)}
     </div>
   </div>`;
