@@ -513,7 +513,11 @@ function renderPersonal(filtered){
   const ownExp  = ownTxs.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0);
   const sharedExp = sharedTxs.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0);
   const totalExp  = ownExp + sharedExp/2;
-  const balance   = ownInc - totalExp;
+  // Repayments: money paid OUT reduces balance, money received increases it
+  const monthReps = s.reps.filter(r=>r.month===s.fM&&r.year===s.fY);
+  const paidOut   = monthReps.filter(r=>r.from===selPerson).reduce((a,r)=>a+r.amount,0);
+  const received  = monthReps.filter(r=>r.from!==selPerson&&r.from!=="Wspólne").reduce((a,r)=>a+r.amount,0);
+  const balance   = ownInc - totalExp - paidOut + received;
 
   // Categories breakdown (own + half shared)
   const catMap = {};
@@ -549,6 +553,8 @@ function renderPersonal(filtered){
       <div class="card" style="padding:12px">
         <div style="font-size:10px;color:${C.mut};margin-bottom:4px">= Bilans</div>
         <div style="font-weight:700;font-size:13px;color:${balance>=0?C.inc:C.exp}">${fmt(balance)}</div>
+        ${paidOut>0?`<div style="font-size:9px;color:${C.exp};margin-top:2px">oddane: -${fmt(paidOut)}</div>`:""}
+        ${received>0?`<div style="font-size:9px;color:${C.inc};margin-top:2px">otrzymane: +${fmt(received)}</div>`:""}
       </div>
     </div>
 
