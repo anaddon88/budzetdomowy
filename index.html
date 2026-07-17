@@ -257,18 +257,23 @@ function renderDashboard(filtered, settle, cd, tot, adjBal){
     const col = [C.p1,C.p2,C.sh][i];
     const label = s.names[i];
     const pt = totals(filtered.filter(t=>t.person===PERSONS[i]));
-    const repPaid = i===0?p1rep:i===1?p2rep:0;
-    const repRcv  = i===0?p2rep:i===1?p1rep:0;
-    const adjExp  = pt.exp + repPaid - repRcv;
-    const repNote = (repPaid>0||repRcv>0)&&i<2 ? `<span style="font-size:10px;color:${C.mut};font-style:italic">(${repPaid>0?"+":""}${fmt(repPaid-repRcv)} spłata)</span>` : "";
-    return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${i<2?10:0}px">
+    const sharedExp = filtered.filter(t=>t.type==="expense"&&t.person==="Wspólne").reduce((a,t)=>a+t.amount,0);
+    const repPaid = i===0?p1rep:p2rep;
+    const repRcv  = i===0?p2rep:p1rep;
+    const totalExp = pt.exp + sharedExp/2 + repPaid;
+    const totalInc = pt.inc + repRcv;
+    const balance  = totalInc - totalExp;
+    const repNote  = repPaid>0||repRcv>0 ? `<div style="font-size:10px;color:${C.mut};margin-top:1px">${repPaid>0?`spłata: -${fmt(repPaid)}`:""}${repPaid>0&&repRcv>0?" · ":""}${repRcv>0?`otrzymano: +${fmt(repRcv)}`:""}</div>` : "";
+    return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${i===0?10:0}px">
       <div style="display:flex;align-items:center;gap:8px">
         <div style="width:8px;height:8px;border-radius:50%;background:${col}"></div>
         <span style="font-size:14px">${label}</span>
       </div>
       <div style="text-align:right">
-        <div style="font-size:11px;color:${C.inc}">+${fmt(pt.inc)}</div>
-        <div style="font-size:11px;color:${C.exp};display:flex;align-items:center;gap:4px;justify-content:flex-end">-${fmt(adjExp)} ${repNote}</div>
+        <div style="font-size:11px;color:${C.inc}">+${fmt(totalInc)}</div>
+        <div style="font-size:11px;color:${C.exp}">-${fmt(totalExp)}</div>
+        ${repNote}
+        <div style="font-size:13px;font-weight:700;color:${balance>=0?C.inc:C.exp}">${fmt(balance)}</div>
       </div>
     </div>`;
   }).join("");
