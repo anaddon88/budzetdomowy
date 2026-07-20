@@ -790,17 +790,24 @@ function calcSettlement(filtered){
   const p2o=filtered.filter(t=>t.type==="expense"&&t.person===PERSONS[1]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
   const sh =filtered.filter(t=>t.type==="expense"&&t.person==="Wspólne"&&inScope(t)).reduce((a,t)=>a+t.amount,0);
   const total=p1o+p2o+sh; if(!total) return null;
-  const fair=total/2; const p1paid=p1o+sh/2; const p2paid=p2o+sh/2; const p1bal=p1paid-fair;
+  const fair=total/2; const p1paid=p1o+sh/2; const p2paid=p2o+sh/2;
+  // p1bal > 0 means p1 overpaid (p2 owes p1), p1bal < 0 means p2 overpaid (p1 owes p2)
+  const p1bal=p1paid-fair;
   const monthReps=s.reps.filter(r=>r.month===s.fM&&r.year===s.fY);
-  // Net repayments: p1→p2 is negative for p1bal, p2→p1 is positive
-  const netRep=monthReps.reduce((a,r)=>r.from===PERSONS[0]?a-r.amount:a+r.amount,0);
-  const netBal=p1bal+netRep;
-  const debtor=netBal<0?s.names[0]:s.names[1];
-  const debtorP=netBal<0?PERSONS[0]:PERSONS[1];
-  const creditor=netBal<0?s.names[1]:s.names[0];
+  // Each repayment from p1 reduces p1's credit (or increases p1's debt)
+  // Each repayment from p2 reduces p2's credit (or increases p2's debt)
+  // Net balance after repayments: positive = p2 still owes p1, negative = p1 owes p2
+  const p1rep=monthReps.filter(r=>r.from===PERSONS[0]).reduce((a,r)=>a+r.amount,0);
+  const p2rep=monthReps.filter(r=>r.from===PERSONS[1]).reduce((a,r)=>a+r.amount,0);
+  // p1bal: how much p2 owes p1 based on expenses
+  // subtract p2's payments to p1, add p1's payments to p2
+  const netBal=p1bal - p2rep + p1rep;
+  // netBal > 0: p2 still owes p1 | netBal < 0: p1 now owes p2
+  const debtor  = netBal>0 ? s.names[1] : s.names[0];
+  const debtorP = netBal>0 ? PERSONS[1]  : PERSONS[0];
+  const creditor= netBal>0 ? s.names[0]  : s.names[1];
   const raw=Math.abs(p1bal);
-  const repaid=monthReps.filter(r=>r.from===(p1bal<0?PERSONS[0]:PERSONS[1])).reduce((a,r)=>a+r.amount,0);
-  const overpaid=monthReps.filter(r=>r.from!==(p1bal<0?PERSONS[0]:PERSONS[1])).reduce((a,r)=>a+r.amount,0);
+  const repaid=netBal>0 ? p2rep : p1rep;
   const after=Math.abs(netBal);
   return {p1o,p2o,sh,total,p1paid,p2paid,raw,after,debtor,creditor,debtorP,repaid,monthReps,maxPaid:Math.max(p1paid,p2paid,1)};
 }
