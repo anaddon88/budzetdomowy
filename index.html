@@ -412,8 +412,11 @@ function renderSettle(st){
 
   const sharedNote = st.sh>0 ? `<div style="font-size:11px;color:${C.mut};margin-bottom:10px;padding:6px 10px;background:#334155;border-radius:8px">Wydatki wspólne ${fmt(st.sh)} podzielone po ${fmt(st.sh/2)} na osobę</div>` : "";
 
+  // Show current state after all repayments
   let verdict = "";
-  if(st.raw>0.01){
+  if(st.after < 0.01){
+    verdict = `<div style="padding:10px;border-radius:12px;background:#14532d33;border:1px solid #22c55e44;text-align:center;font-size:13px;font-weight:600;color:${C.inc};margin-bottom:12px">✅ Wydatki są równo podzielone</div>`;
+  } else {
     const repLines = st.repaid>0 ? `
       <div style="display:flex;justify-content:space-between;font-size:11px;color:${C.mut};padding:4px 0;border-top:1px solid ${C.bdr};margin-bottom:4px">
         <span>Pierwotny dług:</span><span style="text-decoration:line-through">${fmt(st.raw)}</span>
@@ -425,13 +428,12 @@ function renderSettle(st){
       <div style="font-size:11px;color:${C.mut};text-align:center;margin-bottom:4px">Do wyrównania</div>
       <div style="font-size:15px;font-weight:700;color:${C.acc};text-align:center;margin-bottom:4px">${st.debtor} → ${st.creditor}</div>
       ${repLines}
-      <div style="font-size:${st.after<0.01?18:24}px;font-weight:800;color:${st.after<0.01?C.inc:'#fff'};text-align:center">${st.after<0.01?"✅ Dług spłacony!":fmt(st.after)}</div>
+      <div style="font-size:24px;font-weight:800;color:#fff;text-align:center">${fmt(st.after)}</div>
     </div>`;
-  } else {
-    verdict = `<div style="padding:10px;border-radius:12px;background:#14532d33;border:1px solid #22c55e44;text-align:center;font-size:13px;font-weight:600;color:${C.inc};margin-bottom:12px">✅ Wydatki są równo podzielone</div>`;
   }
 
-  const repForm = st.raw>0.01&&st.after>0.01 ? `
+  // Repayment form — always show so either person can register a payment
+  const repForm = st.after > 0.01 ? `
     <div style="border-top:1px solid ${C.bdr};padding-top:12px">
       <div style="font-size:12px;font-weight:600;color:${C.mut};margin-bottom:8px">💸 Zarejestruj spłatę</div>
       <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -789,11 +791,17 @@ function calcSettlement(filtered){
   const sh =filtered.filter(t=>t.type==="expense"&&t.person==="Wspólne"&&inScope(t)).reduce((a,t)=>a+t.amount,0);
   const total=p1o+p2o+sh; if(!total) return null;
   const fair=total/2; const p1paid=p1o+sh/2; const p2paid=p2o+sh/2; const p1bal=p1paid-fair;
-  const debtor=p1bal<0?s.names[0]:s.names[1]; const debtorP=p1bal<0?PERSONS[0]:PERSONS[1]; const creditor=p1bal<0?s.names[1]:s.names[0];
-  const raw=Math.abs(p1bal);
   const monthReps=s.reps.filter(r=>r.month===s.fM&&r.year===s.fY);
-  const repaid=monthReps.filter(r=>r.from===debtorP).reduce((a,r)=>a+r.amount,0);
-  const after=Math.max(0,raw-repaid);
+  // Net repayments: p1→p2 is negative for p1bal, p2→p1 is positive
+  const netRep=monthReps.reduce((a,r)=>r.from===PERSONS[0]?a-r.amount:a+r.amount,0);
+  const netBal=p1bal+netRep;
+  const debtor=netBal<0?s.names[0]:s.names[1];
+  const debtorP=netBal<0?PERSONS[0]:PERSONS[1];
+  const creditor=netBal<0?s.names[1]:s.names[0];
+  const raw=Math.abs(p1bal);
+  const repaid=monthReps.filter(r=>r.from===(p1bal<0?PERSONS[0]:PERSONS[1])).reduce((a,r)=>a+r.amount,0);
+  const overpaid=monthReps.filter(r=>r.from!==(p1bal<0?PERSONS[0]:PERSONS[1])).reduce((a,r)=>a+r.amount,0);
+  const after=Math.abs(netBal);
   return {p1o,p2o,sh,total,p1paid,p2paid,raw,after,debtor,creditor,debtorP,repaid,monthReps,maxPaid:Math.max(p1paid,p2paid,1)};
 }
 
