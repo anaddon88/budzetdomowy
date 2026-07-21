@@ -403,14 +403,14 @@ function renderSettle(st){
     <div style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px">
         <div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;border-radius:50%;background:${p.col}"></div><b>${p.name}</b></div>
-        <span style="color:${C.mut}">własne: <span style="color:${C.exp}">${fmt(p.own)}</span> · łącznie: <b style="color:${C.txt}">${fmt(p.paid)}</b></span>
+        <span style="color:${C.exp};font-weight:700">${fmt(p.own)}</span>
       </div>
       <div style="height:6px;border-radius:4px;background:#334155">
         <div style="height:6px;border-radius:4px;background:${p.col};width:${(p.paid/st.maxPaid)*100}%"></div>
       </div>
     </div>`).join("");
 
-  const sharedNote = st.sh>0 ? `<div style="font-size:11px;color:${C.mut};margin-bottom:10px;padding:6px 10px;background:#334155;border-radius:8px">Wydatki wspólne ${fmt(st.sh)} podzielone po ${fmt(st.sh/2)} na osobę</div>` : "";
+  const sharedNote = "";
 
   // Show current state after all repayments
   let verdict = "";
@@ -516,8 +516,8 @@ function renderPersonal(filtered){
 
   const ownInc  = ownTxs.filter(t=>t.type==="income").reduce((a,t)=>a+t.amount,0);
   const ownExp  = ownTxs.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0);
-  const sharedExp = sharedTxs.filter(t=>t.type==="expense").reduce((a,t)=>a+t.amount,0);
-  const totalExp  = ownExp + sharedExp/2;
+  const sharedExp = 0;
+  const totalExp  = ownExp;
   // Repayments: money paid OUT reduces balance, money received increases it
   const monthReps = s.reps.filter(r=>r.month===s.fM&&r.year===s.fY);
   const paidOut   = monthReps.filter(r=>r.from===selPerson).reduce((a,r)=>a+r.amount,0);
@@ -553,7 +553,7 @@ function renderPersonal(filtered){
       <div class="card" style="padding:12px">
         <div style="font-size:10px;color:${C.mut};margin-bottom:4px">↓ Wydatki</div>
         <div style="font-weight:700;font-size:13px;color:${C.exp}">${fmt(totalExp)}</div>
-        ${sharedExp>0?`<div style="font-size:9px;color:${C.mut};margin-top:2px">w tym wspólne: ${fmt(sharedExp/2)}</div>`:""}
+
       </div>
       <div class="card" style="padding:12px">
         <div style="font-size:10px;color:${C.mut};margin-bottom:4px">= Bilans</div>
@@ -706,7 +706,7 @@ function renderRecurring(){
         <select class="inp" onchange="setRecForm('category',this.value)">${CATS.map(c=>`<option value="${c}" ${f.category===c?"selected":""}>${c}</option>`).join("")}</select></div>
       <div><label style="font-size:11px;color:${C.mut};font-weight:600;display:block;margin-bottom:6px">Kto płaci?</label>
         <div style="display:flex;gap:8px">
-          ${PERSONS.map((p,i)=>{const col=[C.p1,C.p2,C.sh][i];const lbl=i<2?s.names[i]:"Wspólne";
+          ${PERSONS.slice(0,2).map((p,i)=>{const col=[C.p1,C.p2][i];const lbl=s.names[i];
             return `<button onclick="setRecForm('person','${p}')" style="flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:700;border:2px solid ${col};background:${f.person===p?col:"transparent"};color:${f.person===p?"#fff":col}">${lbl}</button>`;}).join("")}
         </div></div>
       <div style="display:flex;gap:8px">
@@ -788,9 +788,9 @@ function calcSettlement(filtered){
   const inScope = t => !t.excludeFromSettlement && (Array.isArray(s.excl)?!s.excl.includes(t.category):true);
   const p1o=filtered.filter(t=>t.type==="expense"&&t.person===PERSONS[0]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
   const p2o=filtered.filter(t=>t.type==="expense"&&t.person===PERSONS[1]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
-  const sh =filtered.filter(t=>t.type==="expense"&&t.person==="Wspólne"&&inScope(t)).reduce((a,t)=>a+t.amount,0);
-  const total=p1o+p2o+sh; if(!total) return null;
-  const fair=total/2; const p1paid=p1o+sh/2; const p2paid=p2o+sh/2;
+  const sh=0;
+  const total=p1o+p2o; if(!total) return null;
+  const fair=total/2; const p1paid=p1o; const p2paid=p2o;
   // p1bal > 0 means p1 overpaid (p2 owes p1), p1bal < 0 means p2 overpaid (p1 owes p2)
   const p1bal=p1paid-fair;
   const monthReps=s.reps.filter(r=>r.month===s.fM&&r.year===s.fY);
