@@ -415,20 +415,21 @@ function renderSettle(st){
   // Show current state after all repayments
   let verdict = "";
   if(st.after < 0.01){
-    verdict = `<div style="padding:10px;border-radius:12px;background:#14532d33;border:1px solid #22c55e44;text-align:center;font-size:13px;font-weight:600;color:${C.inc};margin-bottom:12px">✅ Wydatki są równo podzielone</div>`;
+    verdict = `<div style="padding:10px;border-radius:12px;background:#14532d33;border:1px solid #22c55e44;text-align:center;font-size:13px;font-weight:600;color:${C.inc};margin-bottom:12px">✅ Rozliczenie wyrównane</div>`;
   } else {
+    const prevNote = st.hasPrevDebt ? `
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:${C.mut};padding:4px 0;border-top:1px solid ${C.bdr};margin-top:6px">
+        <span>Z poprzednich miesięcy:</span><span style="color:${Math.abs(st.prevBal)>0.01?(st.prevBal>0?C.exp:C.inc):C.mut}">${st.prevBal>0?"+":"-"}${fmt(Math.abs(st.prevBal))}</span>
+      </div>` : "";
     const repLines = st.repaid>0 ? `
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:${C.mut};padding:4px 0;border-top:1px solid ${C.bdr};margin-bottom:4px">
-        <span>Pierwotny dług:</span><span style="text-decoration:line-through">${fmt(st.raw)}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:${C.inc};margin-bottom:6px">
-        <span>Spłacono:</span><span>- ${fmt(st.repaid)}</span>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:${C.inc};padding:4px 0">
+        <span>Spłacono w tym miesiącu:</span><span>- ${fmt(st.repaid)}</span>
       </div>` : "";
     verdict = `<div style="padding:12px 14px;border-radius:12px;background:linear-gradient(135deg,#1e3a5f,#1e293b);border:1px solid ${C.acc}44;margin-bottom:12px">
       <div style="font-size:11px;color:${C.mut};text-align:center;margin-bottom:4px">Do wyrównania</div>
-      <div style="font-size:15px;font-weight:700;color:${C.acc};text-align:center;margin-bottom:4px">${st.debtor} → ${st.creditor}</div>
-      ${repLines}
-      <div style="font-size:24px;font-weight:800;color:#fff;text-align:center">${fmt(st.after)}</div>
+      <div style="font-size:15px;font-weight:700;color:${C.acc};text-align:center;margin-bottom:8px">${st.debtor} → ${st.creditor}</div>
+      ${prevNote}${repLines}
+      <div style="font-size:24px;font-weight:800;color:#fff;text-align:center;margin-top:6px">${fmt(st.after)}</div>
     </div>`;
   }
 
@@ -788,28 +789,44 @@ function calcSettlement(filtered){
   const inScope = t => !t.excludeFromSettlement && (Array.isArray(s.excl)?!s.excl.includes(t.category):true);
   const p1o=filtered.filter(t=>t.type==="expense"&&t.person===PERSONS[0]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
   const p2o=filtered.filter(t=>t.type==="expense"&&t.person===PERSONS[1]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
-  const sh=0;
-  const total=p1o+p2o; if(!total) return null;
-  const fair=total/2; const p1paid=p1o; const p2paid=p2o;
-  // p1bal > 0 means p1 overpaid (p2 owes p1), p1bal < 0 means p2 overpaid (p1 owes p2)
-  const p1bal=p1paid-fair;
+  const total=p1o+p2o;
+  const fair=total/2;
+  const p1bal=p1o-fair; // >0 = p2 owes p1, <0 = p1 owes p2
+
+  // Current month repayments
   const monthReps=s.reps.filter(r=>r.month===s.fM&&r.year===s.fY);
-  // Each repayment from p1 reduces p1's credit (or increases p1's debt)
-  // Each repayment from p2 reduces p2's credit (or increases p2's debt)
-  // Net balance after repayments: positive = p2 still owes p1, negative = p1 owes p2
   const p1rep=monthReps.filter(r=>r.from===PERSONS[0]).reduce((a,r)=>a+r.amount,0);
   const p2rep=monthReps.filter(r=>r.from===PERSONS[1]).reduce((a,r)=>a+r.amount,0);
-  // p1bal: how much p2 owes p1 based on expenses
-  // subtract p2's payments to p1, add p1's payments to p2
-  const netBal=p1bal - p2rep + p1rep;
-  // netBal > 0: p2 still owes p1 | netBal < 0: p1 now owes p2
+
+  // Cumulative debt from ALL previous months (expenses - repayments across all history)
+  // For each past month: calculate net balance and sum them up
+  const allMonthKeys = [...new Set(s.txs.map(t=>`${t.year}-${t.month}`).concat(s.reps.map(r=>`${r.year}-${r.month}`)))];
+  let prevBal = 0;
+  allMonthKeys.forEach(key=>{
+    const [y,m] = key.split("-").map(Number);
+    if(y>s.fY||(y===s.fY&&m>=s.fM)) return; // skip current and future months
+    const mTxs = s.txs.filter(t=>t.year===y&&t.month===m);
+    const mReps = s.reps.filter(r=>r.year===y&&r.month===m);
+    const mp1o = mTxs.filter(t=>t.type==="expense"&&t.person===PERSONS[0]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
+    const mp2o = mTxs.filter(t=>t.type==="expense"&&t.person===PERSONS[1]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
+    const mTotal = mp1o+mp2o;
+    const mFair = mTotal/2;
+    const mp1bal = mp1o - mFair;
+    const mp1rep = mReps.filter(r=>r.from===PERSONS[0]).reduce((a,r)=>a+r.amount,0);
+    const mp2rep = mReps.filter(r=>r.from===PERSONS[1]).reduce((a,r)=>a+r.amount,0);
+    prevBal += mp1bal - mp2rep + mp1rep;
+  });
+
+  // Total net balance = previous months + current month
+  const netBal = prevBal + p1bal - p2rep + p1rep;
   const debtor  = netBal>0 ? s.names[1] : s.names[0];
   const debtorP = netBal>0 ? PERSONS[1]  : PERSONS[0];
   const creditor= netBal>0 ? s.names[0]  : s.names[1];
-  const raw=Math.abs(p1bal);
-  const repaid=netBal>0 ? p2rep : p1rep;
+  const raw=Math.abs(p1bal - p2rep + p1rep); // current month only
   const after=Math.abs(netBal);
-  return {p1o,p2o,sh,total,p1paid,p2paid,raw,after,debtor,creditor,debtorP,repaid,monthReps,maxPaid:Math.max(p1paid,p2paid,1)};
+  const repaid=netBal>0 ? p2rep : p1rep;
+  const hasPrevDebt = Math.abs(prevBal) > 0.01;
+  return {p1o,p2o,total,p1paid:p1o,p2paid:p2o,raw,after,debtor,creditor,debtorP,repaid,monthReps,maxPaid:Math.max(p1o,p2o,1),prevBal,hasPrevDebt};
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
