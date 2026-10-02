@@ -813,15 +813,7 @@ function calcSettlement(filtered){
   allMonthKeys.forEach(key=>{
     const [y,m] = key.split("-").map(Number);
     if(y>s.fY||(y===s.fY&&m>=s.fM)) return; // skip current and future months
-    const mTxsDb = s.txs.filter(t=>t.year===y&&t.month===m);
-    // Add virtual recurring for this month too
-    const mVirtual = s.recurring.filter(r=>r.active).map(r=>{
-      const rKey=`rec_${r.id}_${y}_${m}`;
-      const exists=mTxsDb.find(t=>t.recurringKey===rKey);
-      if(exists) return null;
-      return {type:"expense",amount:+r.amount,person:r.person,excludeFromSettlement:!!r.excludeFromSettlement,recurringKey:rKey};
-    }).filter(Boolean);
-    const mTxs = [...mTxsDb, ...mVirtual];
+    const mTxs = s.txs.filter(t=>t.year===y&&t.month===m);
     const mReps = s.reps.filter(r=>r.year===y&&r.month===m);
     const mp1o = mTxs.filter(t=>t.type==="expense"&&t.person===PERSONS[0]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
     const mp2o = mTxs.filter(t=>t.type==="expense"&&t.person===PERSONS[1]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
