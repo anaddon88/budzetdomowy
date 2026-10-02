@@ -939,6 +939,33 @@ function injectRecurring(r){
   fbSet(`transactions/${tx.id}`,tx);
 }
 
+function injectRecurringAllMonths(rec){
+  // Inject recurring transactions for all months from start date until current month
+  const now = new Date();
+  const curY = now.getFullYear(), curM = now.getMonth();
+  rec.filter(r=>r.active).forEach(r=>{
+    // Go back up to 12 months
+    for(let i=0; i<=12; i++){
+      const d = new Date(curY, curM-i, 1);
+      const y = d.getFullYear(), m = d.getMonth();
+      const key = `rec_${r.id}_${y}_${m}`;
+      const exists = STATE.txs.find(t=>t.recurringKey===key);
+      if(!exists){
+        const tx={
+          id: Date.now()+Math.random()+(i*1000),
+          recurringKey:key, recurringId:r.id,
+          type:"expense", amount:+r.amount,
+          category:r.category, person:r.person,
+          description:r.name, day:r.day||1,
+          month:m, year:y,
+          excludeFromSettlement:!!r.excludeFromSettlement
+        };
+        fbSet(`transactions/${tx.id}`,tx);
+      }
+    }
+  });
+}
+
 // ── Scanner ───────────────────────────────────────────────────────────────────
 function openScanner(){
   const overlay=document.createElement("div");
@@ -1040,6 +1067,7 @@ auth.onAuthStateChanged(user=>{
       STATE.recurring=rec;
       // Auto-inject active recurring for current month
       rec.filter(r=>r.active).forEach(r=>injectRecurring(r));
+      injectRecurringAllMonths(rec);
       render();
     });
     db.ref("names").on("value",s=>{ if(s.val()&&Array.isArray(s.val())) setState({names:s.val()}); });
