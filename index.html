@@ -963,8 +963,8 @@ function injectRecurringAllMonths(rec){
       const key = `rec_${r.id}_${y}_${m}`;
       const exists = STATE.txs.find(t=>t.recurringKey===key);
       if(!exists){
-        // Use stable ID based on key so no duplicates even if called multiple times
-        const stableId = parseInt(r.id) + y*10000 + m*100 + i;
+        // Use stable ID based on key - simple hash to avoid duplicates
+        const stableId = key.split("").reduce((a,c)=>((a<<5)-a)+c.charCodeAt(0)|0, 0) + 2000000000;
         const tx={
           id: stableId,
           recurringKey:key, recurringId:r.id,
@@ -1073,15 +1073,24 @@ function parseOCR(txt){
 auth.onAuthStateChanged(user=>{
   STATE.authed=!!user; STATE.authChecked=true;
   if(user){
-    db.ref("transactions").on("value",s=>setState({txs:s.val()?Object.values(s.val()):[],syncStatus:"connected"}));
+    db.ref("transactions").on("value",s=>{
+      STATE.txs=s.val()?Object.values(s.val()):[];
+      STATE.syncStatus="connected";
+      STATE.txsLoaded=true;
+      // Once txs are loaded, inject recurring if recurring already loaded
+      if(STATE.recurringLoaded) injectRecurringAllMonths(STATE.recurring);
+      render();
+    });
     db.ref("repayments").on("value",s=>setState({reps:s.val()?Object.values(s.val()):[]}));
     db.ref("excludedCats").on("value",s=>setState({excl:s.val()||[]}));
     db.ref("recurring").on("value",s=>{
       const rec=s.val()?Object.values(s.val()):[];
       STATE.recurring=rec;
+      STATE.recurringLoaded=true;
       // Auto-inject active recurring for current month
       rec.filter(r=>r.active).forEach(r=>injectRecurring(r));
-      injectRecurringAllMonths(rec);
+      // Only inject all months if txs already loaded (avoid race condition)
+      if(STATE.txsLoaded) injectRecurringAllMonths(rec);
       render();
     });
     db.ref("names").on("value",s=>{ if(s.val()&&Array.isArray(s.val())) setState({names:s.val()}); });
