@@ -151,7 +151,15 @@ function render(){
     return;
   }
 
-  const filtered = s.txs.filter(t=>t.month===s.fM&&t.year===s.fY);
+  const dbFiltered = s.txs.filter(t=>t.month===s.fM&&t.year===s.fY);
+  // Add virtual recurring transactions not yet in DB
+  const virtualRec = s.recurring.filter(r=>r.active).map(r=>{
+    const key=`rec_${r.id}_${s.fY}_${s.fM}`;
+    const exists=s.txs.find(t=>t.recurringKey===key);
+    if(exists) return null;
+    return {id:`virtual_${key}`,recurringKey:key,recurringId:r.id,type:"expense",amount:+r.amount,category:r.category,person:r.person,description:r.name,day:r.day||1,month:s.fM,year:s.fY,excludeFromSettlement:!!r.excludeFromSettlement};
+  }).filter(Boolean);
+  const filtered = [...dbFiltered, ...virtualRec];
   const settle = calcSettlement(filtered);
   const cd = catData(filtered);
   const tot = totals(filtered);
@@ -805,7 +813,15 @@ function calcSettlement(filtered){
   allMonthKeys.forEach(key=>{
     const [y,m] = key.split("-").map(Number);
     if(y>s.fY||(y===s.fY&&m>=s.fM)) return; // skip current and future months
-    const mTxs = s.txs.filter(t=>t.year===y&&t.month===m);
+    const mTxsDb = s.txs.filter(t=>t.year===y&&t.month===m);
+    // Add virtual recurring for this month too
+    const mVirtual = s.recurring.filter(r=>r.active).map(r=>{
+      const rKey=`rec_${r.id}_${y}_${m}`;
+      const exists=mTxsDb.find(t=>t.recurringKey===rKey);
+      if(exists) return null;
+      return {type:"expense",amount:+r.amount,person:r.person,excludeFromSettlement:!!r.excludeFromSettlement,recurringKey:rKey};
+    }).filter(Boolean);
+    const mTxs = [...mTxsDb, ...mVirtual];
     const mReps = s.reps.filter(r=>r.year===y&&r.month===m);
     const mp1o = mTxs.filter(t=>t.type==="expense"&&t.person===PERSONS[0]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
     const mp2o = mTxs.filter(t=>t.type==="expense"&&t.person===PERSONS[1]&&inScope(t)).reduce((a,t)=>a+t.amount,0);
