@@ -887,13 +887,27 @@ function toggleExclCat(cat,isExStr){
 function saveRecurring(){
   const f=STATE.recForm; if(!f.name||!f.amount||isNaN(+f.amount)) return;
   const id=STATE.recEditId||Date.now();
-  fbSet(`recurring/${id}`,{...f,amount:+f.amount,id,active:true});
-  injectRecurring({...f,amount:+f.amount,id,active:true});
+  const rec={...f,amount:+f.amount,id,active:f.active!==false?true:f.active};
+  fbSet(`recurring/${id}`,rec);
+  // If editing, update already-injected transactions for current month
+  if(STATE.recEditId){
+    const key=`rec_${id}_${STATE.fY}_${STATE.fM}`;
+    const existing=STATE.txs.find(t=>t.recurringKey===key);
+    if(existing){
+      fbSet(`transactions/${existing.id}`,{...existing,amount:rec.amount,category:rec.category,person:rec.person,description:rec.name,day:rec.day||1,excludeFromSettlement:!!rec.excludeFromSettlement});
+    } else {
+      injectRecurring(rec);
+    }
+  } else {
+    injectRecurring(rec);
+  }
   setState({recForm:defRecForm(),recEditId:null});
 }
 
 function editRecurring(id){
   const r=STATE.recurring.find(x=>x.id==id); if(!r) return;
+  // Scroll to top of recurring view so form is visible
+  window.scrollTo({top:0,behavior:"smooth"});
   setState({recForm:{...r},recEditId:r.id});
 }
 
@@ -940,19 +954,19 @@ function injectRecurring(r){
 }
 
 function injectRecurringAllMonths(rec){
-  // Inject recurring transactions for all months from start date until current month
   const now = new Date();
   const curY = now.getFullYear(), curM = now.getMonth();
   rec.filter(r=>r.active).forEach(r=>{
-    // Go back up to 12 months
     for(let i=0; i<=12; i++){
       const d = new Date(curY, curM-i, 1);
       const y = d.getFullYear(), m = d.getMonth();
       const key = `rec_${r.id}_${y}_${m}`;
       const exists = STATE.txs.find(t=>t.recurringKey===key);
       if(!exists){
+        // Use stable ID based on key so no duplicates even if called multiple times
+        const stableId = parseInt(r.id) + y*10000 + m*100 + i;
         const tx={
-          id: Date.now()+Math.random()+(i*1000),
+          id: stableId,
           recurringKey:key, recurringId:r.id,
           type:"expense", amount:+r.amount,
           category:r.category, person:r.person,
